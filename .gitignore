@@ -1,0 +1,10 @@
+*.gch
+
+*.cbp
+*.layout
+*.depend
+
+.objs
+
+bin
+obj
