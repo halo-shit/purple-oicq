@@ -1,0 +1,5 @@
+在编译并安装前，安装 libpurple 与 json-c。
+
+   $ make
+   
+   $ sudo make install
