@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <glib.h>
 
+#include "conv.h"
 #include "oicq.h"
 #include "dconn.h"
 #include "handler.h"
@@ -21,7 +22,8 @@ PurplePlugin *oicq_plugin = NULL;
 /**
  * 在 Socket 收到新消息时被调用，事件更新。
  */
-static void do_event_check_cb(gpointer data, gint source, PurpleInputCondition _)
+static void
+do_event_check_cb(gpointer data, gint source, PurpleInputCondition _)
 {
     int t;
     struct json_object *type;
@@ -36,8 +38,7 @@ static void do_event_check_cb(gpointer data, gint source, PurpleInputCondition _
     json_root = json_tokener_parse(oicq->inbuf);
     json_object_object_get_ex(json_root, "status", &status);
 
-    if (json_object_get_int(status) == RET_STATUS_EVENT)
-    {
+    if (json_object_get_int(status) == RET_STATUS_EVENT) {
         json_object_object_get_ex(json_root, "type", &type);
         t = json_object_get_int(type);
 
@@ -48,7 +49,8 @@ static void do_event_check_cb(gpointer data, gint source, PurpleInputCondition _
     }
 }
 
-static void do_whoami_check_cb(gpointer data, gint source, PurpleInputCondition _)
+static void
+do_whoami_check_cb(gpointer data, gint source, PurpleInputCondition _)
 {
     PurpleConnection *pc = data;
     struct json_object *status;
@@ -60,8 +62,7 @@ static void do_whoami_check_cb(gpointer data, gint source, PurpleInputCondition 
     json_root = json_tokener_parse(oicq->inbuf);
     json_object_object_get_ex(json_root, "status", &status);
 
-    if (json_object_get_int(status))
-    {
+    if (json_object_get_int(status)) {
         purple_connection_error_reason(pc,
                                     PURPLE_CONNECTION_ERROR_AUTHENTICATION_FAILED,
                                     "没能查询到身份");
@@ -77,7 +78,8 @@ static void do_whoami_check_cb(gpointer data, gint source, PurpleInputCondition 
     pc->inpa = purple_input_add(oicq->fd, PURPLE_INPUT_READ, do_event_check_cb, pc);
 }
 
-static void do_login_check_cb(gpointer data, gint source, PurpleInputCondition _)
+static void
+do_login_check_cb(gpointer data, gint source, PurpleInputCondition _)
 {
     PurpleConnection *pc = data;
     struct json_object *status;
@@ -89,8 +91,7 @@ static void do_login_check_cb(gpointer data, gint source, PurpleInputCondition _
     json_root = json_tokener_parse(oicq->inbuf);
     json_object_object_get_ex(json_root, "status", &status);
 
-    if (json_object_get_int(status))
-    {
+    if (json_object_get_int(status)) {
         purple_connection_error_reason(pc,
                                     PURPLE_CONNECTION_ERROR_AUTHENTICATION_FAILED,
                                     "没能登录到 QQ 服务");
@@ -103,7 +104,8 @@ static void do_login_check_cb(gpointer data, gint source, PurpleInputCondition _
     pc->inpa = purple_input_add(oicq->fd, PURPLE_INPUT_READ, do_whoami_check_cb, pc);
 }
 
-static void do_init_check_cb(gpointer data, gint source, PurpleInputCondition _)
+static void
+do_init_check_cb(gpointer data, gint source, PurpleInputCondition _)
 {
     PurpleConnection *pc = data;
     struct json_object *status;
@@ -115,8 +117,7 @@ static void do_init_check_cb(gpointer data, gint source, PurpleInputCondition _)
     json_root = json_tokener_parse(oicq->inbuf);
     json_object_object_get_ex(json_root, "status", &status);
 
-    if (json_object_get_int(status))
-    {
+    if (json_object_get_int(status)) {
         purple_connection_error_reason(pc,
                                     PURPLE_CONNECTION_ERROR_OTHER_ERROR,
                                     "没能初始化 OICQ 客户端");
@@ -136,7 +137,8 @@ static void do_init_check_cb(gpointer data, gint source, PurpleInputCondition _)
  * 如果好友是 NULL 而帐号是非 NULL，返回对应的文字来显示帐号图标。
  * 如果都为 NULL，则返回协议的图标。
  */
-static const char *prpl_list_icon(PurpleAccount *acct, PurpleBuddy *buddy)
+static const char *
+prpl_list_icon(PurpleAccount *acct, PurpleBuddy *buddy)
 {
     return "oicq";
 }
@@ -146,7 +148,8 @@ static const char *prpl_list_icon(PurpleAccount *acct, PurpleBuddy *buddy)
  *
  * 目前只有在线和离线两种。
  */
-static GList *prpl_status_types(PurpleAccount *acct)
+static GList *
+prpl_status_types(PurpleAccount *acct)
 {
     GList *types = NULL;
     PurpleStatusType *type;
@@ -166,16 +169,17 @@ static GList *prpl_status_types(PurpleAccount *acct)
  * 用于获取一系列消息，来将聊天添加到好友列表。
  *
  * 其中的第一项是一个独一无二的名字，用于在执行 purple_blist_find_chat 时，
- * 确认好友列表的聊天。(在这里是与 QQ 号关联的文本)
+ * 确认好友列表的聊天。(在这里是与 QQ 群号关联的文本)
  */
-static GList *prpl_chat_info(PurpleConnection *gc)
+static GList *
+prpl_chat_info(PurpleConnection *gc)
 {
     /* 定义在 prpl.h */
     struct proto_chat_entry *pce;
 
     pce = g_new0(struct proto_chat_entry, 1);
-    pce->label = "QQ ID"; /* 需要本地化 */
-    pce->identifier = PRPL_CHAT_INFO_QQ_ID;
+    pce->label = "群号:"; /* 需要本地化 */
+    pce->identifier = PRPL_CHAT_INFO_QQ_GID;
     pce->required = TRUE;
 
     return g_list_append(NULL, pce);
@@ -184,7 +188,8 @@ static GList *prpl_chat_info(PurpleConnection *gc)
 /**
  * 用于获取默认聊天信息。
  */
-static GHashTable *prpl_chat_info_defaults(PurpleConnection *gc,
+static GHashTable *
+prpl_chat_info_defaults(PurpleConnection *gc,
                                           const char *chat)
 {
     GHashTable *defaults;
@@ -196,7 +201,8 @@ static GHashTable *prpl_chat_info_defaults(PurpleConnection *gc,
 /**
  * 建立到 OICQ 守护程序和 QQ 帐号的连接。
  */
-void prpl_login(PurpleAccount *acct)
+void
+prpl_login(PurpleAccount *acct)
 {
     char buf[GENERAL_BUF_SIZE];
     struct oicq_conn *oicq;
@@ -207,8 +213,7 @@ void prpl_login(PurpleAccount *acct)
     purple_connection_set_state(pc, PURPLE_CONNECTING);
     purple_connection_update_progress(pc, "连接到后端", 0, 3);
 
-    if (oicq_connect(&sockfd) < 0)
-    {
+    if (oicq_connect(&sockfd) < 0) {
         purple_connection_error_reason(pc,
                                     PURPLE_CONNECTION_ERROR_OTHER_ERROR,
                                     "没能连接到 OICQ 服务器");
@@ -233,7 +238,8 @@ void prpl_login(PurpleAccount *acct)
 /**
  * 断开到 OICQ 守护程序和 QQ 帐号的连接。
  */
-static void prpl_close(PurpleConnection *pc)
+static void
+prpl_close(PurpleConnection *pc)
 {
     /* 断开 Socket，清理内存 */
 }
@@ -241,9 +247,10 @@ static void prpl_close(PurpleConnection *pc)
 /**
  * 用于获取聊天的名字。
  */
-static char *prpl_get_chat_name(GHashTable *components)
+static char *
+prpl_get_chat_name(GHashTable *components)
 {
-    const char *room = g_hash_table_lookup(components, PRPL_CHAT_INFO_QQ_ID);
+    const char *room = g_hash_table_lookup(components, PRPL_CHAT_INFO_QQ_GID);
     return g_strdup(room);
 }
 
@@ -251,35 +258,40 @@ static char *prpl_get_chat_name(GHashTable *components)
 /**
  * 处理在好友列表中双击聊天，或接收一个聊天邀请。
  */
-static void prpl_join_chat(PurpleConnection *gc, GHashTable *components)
+static void
+prpl_join_chat(PurpleConnection *pc, GHashTable *components)
 {
-    /*
-    const char *room = g_hash_table_lookup(components, PRPL_CHAT_INFO_ROOM_ID);
-    int chat_id = g_str_hash(room);
-    PurpleConversation *conv;
+    char chat_id[12];
+    const char *gid;
     PurpleConvChat *chat;
+    PurpleConversation *conv;
 
-    conv = purple_find_chat(gc, chat_id);
+    gid = g_hash_table_lookup(components, PRPL_CHAT_INFO_QQ_GID);
+    g_assert(gid != NULL);
+
+    snprintf(chat_id, 12, "%sg", gid);
+
+    conv = purple_find_chat(pc, g_str_hash(chat_id));
 
     if(!conv) {
-        matrix_connection_join_room(gc, room, components);
+        conv = create_group_conv(pc, chat_id);
         return;
     }
 
     chat = PURPLE_CONV_CHAT(conv);
     chat->left = FALSE;
 
-    if (!g_slist_find(gc->buddy_chats, conv))
-            gc->buddy_chats = g_slist_append(gc->buddy_chats, conv);
+    if (!g_slist_find(pc->buddy_chats, conv))
+            pc->buddy_chats = g_slist_append(pc->buddy_chats, conv);
     purple_conversation_update(conv, PURPLE_CONV_UPDATE_CHATLEFT);
-    */
 }
 
 
 /**
  * 处理拒绝聊天。
  */
-static void prpl_reject_chat(PurpleConnection *gc, GHashTable *components)
+static void
+prpl_reject_chat(PurpleConnection *gc, GHashTable *components)
 {
     /* 什么也不做 */
 }
@@ -287,7 +299,8 @@ static void prpl_reject_chat(PurpleConnection *gc, GHashTable *components)
 /**
  * 处理邀请聊天。
  */
-static void prpl_chat_invite(PurpleConnection *gc, int id,
+static void
+prpl_chat_invite(PurpleConnection *gc, int id,
         const char *message, const char *who)
 {
     /* Invite */
@@ -296,7 +309,8 @@ static void prpl_chat_invite(PurpleConnection *gc, int id,
 /**
  * 处理退出聊天：告诉服务器，并清理内存。
  */
-static void prpl_chat_leave(PurpleConnection *gc, int id) {
+static void
+prpl_chat_leave(PurpleConnection *gc, int id) {
     PurpleConversation *conv = purple_find_chat(gc, id);
     purple_debug_info(PRPL_ID, "%s is leaving chat room %s\n",
                       gc->account->username, conv->name);
@@ -306,7 +320,8 @@ static void prpl_chat_leave(PurpleConnection *gc, int id) {
 /**
  * 处理发送群聊消息。
  */
-static int prpl_chat_send(PurpleConnection *pc, int id,
+static int
+prpl_chat_send(PurpleConnection *pc, int id,
         const char *message, PurpleMessageFlags flags) {
     PurpleConversation *conv = purple_find_chat(pc, id);
     if(!conv) {
@@ -321,7 +336,8 @@ static int prpl_chat_send(PurpleConnection *pc, int id,
 /**
  * 处理发送私聊消息。
  */
-static int prpl_im_send(PurpleConnection *pc, const char *who,
+static int
+prpl_im_send(PurpleConnection *pc, const char *who,
         const char *message, PurpleMessageFlags flags) {
     PurpleConversation *conv = purple_find_conversation_with_account(PURPLE_CONV_TYPE_IM, who, pc->account);
     if(!conv) {
@@ -339,7 +355,8 @@ static int prpl_im_send(PurpleConnection *pc, const char *who,
  *
  * @returns 字符串，会被调用者清理。
  */
-static char *prpl_get_cb_real_name(PurpleConnection *gc, int id,
+static char *
+prpl_get_cb_real_name(PurpleConnection *gc, int id,
         const char *who)
 {
     PurpleConversation *conv = purple_find_chat(gc, id);
@@ -352,7 +369,8 @@ static char *prpl_get_cb_real_name(PurpleConnection *gc, int id,
 /**
  * 动作列表，在插件菜单中显示。
  */
-static GList *prpl_actions(PurplePlugin *plugin, gpointer context)
+static GList *
+prpl_actions(PurplePlugin *plugin, gpointer context)
 {
   GList *list = NULL;
 
@@ -448,7 +466,8 @@ static PurplePluginProtocolInfo prpl_info =
     NULL                                   /* 加好友，附带邀请 */
 };
 
-static void prpl_init(PurplePlugin *plugin)
+static void
+prpl_init(PurplePlugin *plugin)
 {
     GList *protocol_options = NULL;
 

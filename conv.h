@@ -1,3 +1,5 @@
+#include <purple.h>
+
 #ifndef CONV_H_INCLUDED
 #define CONV_H_INCLUDED
 

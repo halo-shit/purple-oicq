@@ -27,6 +27,6 @@ int oicq_login(int*, char*);
 
 int oicq_state(int*);
 
-#define GENERAL_BUF_SIZE 20480
+#define GENERAL_BUF_SIZE 40960
 
 #endif // CONN_H_INCLUDED

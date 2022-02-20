@@ -13,7 +13,8 @@
  * @param conv PurpleConversation
  * @param id 不带标识符的 QQ 群号
  */
-void init_group_conv_ulist(PurpleConnection *pc, PurpleConversation *conv, char *id)
+void
+init_group_conv_ulist(PurpleConnection *pc, PurpleConversation *conv, char *id)
 {
     struct oicq_conn *oicq = pc->proto_data;
     struct json_object *json_root;
@@ -47,7 +48,8 @@ void init_group_conv_ulist(PurpleConnection *pc, PurpleConversation *conv, char 
  * @param pc PurpleConnection
  * @param fixed_uid 后面带有标识符的 QQ 号（例：0000000000d）
  */
-PurpleConversation* create_friend_conv(PurpleConnection *pc, char* fixed_uid)
+PurpleConversation *
+create_friend_conv(PurpleConnection *pc, char* fixed_uid)
 {
     struct oicq_conn *oicq = pc->proto_data;
     struct json_object *json_root;
@@ -84,7 +86,8 @@ PurpleConversation* create_friend_conv(PurpleConnection *pc, char* fixed_uid)
  * @param pc PurpleConnection
  * @param fixed_id 后面带有标识符的 QQ 群号（例：000000000g）
  */
-PurpleConversation* create_group_conv(PurpleConnection *pc, char* fixed_id)
+PurpleConversation *
+create_group_conv(PurpleConnection *pc, char* fixed_id)
 {
     struct oicq_conn *oicq = pc->proto_data;
     struct json_object *json_root;

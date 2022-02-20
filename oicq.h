@@ -20,7 +20,7 @@ struct oicq_conn {
 #define PRPL_ID "prpl-hammer-oicq"
 
 /* 聊天信息 "components" 的标识 */
-#define PRPL_CHAT_INFO_QQ_ID "room_id"
+#define PRPL_CHAT_INFO_QQ_GID "group_id"
 
 #define PRPL_ACCOUNT_OPT_HOST "host"
 #define PRPL_ACCOUNT_OPT_PORT "port"

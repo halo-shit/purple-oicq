@@ -9,7 +9,8 @@
 #include "dconn.h"
 #include "handler.h"
 
-void handle_im_send(PurpleConnection *pc, PurpleConversation *conv, const char *text)
+void
+handle_im_send(PurpleConnection *pc, PurpleConversation *conv, const char *text)
 {
     struct oicq_conn *oicq = pc->proto_data;
     char *uid = purple_conversation_get_data(conv, "uid");
@@ -23,7 +24,8 @@ void handle_im_send(PurpleConnection *pc, PurpleConversation *conv, const char *
                            PURPLE_MESSAGE_SEND, g_get_real_time()/1000/1000);
 }
 
-void handle_chat_send(PurpleConnection *pc, PurpleConversation *conv, const char *text)
+void
+handle_chat_send(PurpleConnection *pc, PurpleConversation *conv, const char *text)
 {
     struct oicq_conn *oicq = pc->proto_data;
     char *id = purple_conversation_get_data(conv, "id");
@@ -37,7 +39,8 @@ void handle_chat_send(PurpleConnection *pc, PurpleConversation *conv, const char
                            PURPLE_MESSAGE_SEND, g_get_real_time()/1000/1000);
 }
 
-void handle_friend_msg(PurpleConnection *pc, struct json_object *body)
+void
+handle_friend_msg(PurpleConnection *pc, struct json_object *body)
 {
     struct json_object *uid;
     struct json_object *text;
@@ -58,13 +61,13 @@ void handle_friend_msg(PurpleConnection *pc, struct json_object *body)
         conv = create_friend_conv(pc, id);
 
     const char *uname = purple_conversation_get_data(conv, "uname");
-    purple_conv_im_write(PURPLE_CONV_IM(conv),
-                           uname,
-                           json_object_get_string(text),
-                           PURPLE_MESSAGE_RECV, json_object_get_int64(timestamp));
+    serv_got_im(pc, uname,
+                json_object_get_string(text),
+                PURPLE_MESSAGE_RECV, json_object_get_int64(timestamp));
 }
 
-void handle_group_msg(PurpleConnection *pc, struct json_object *body)
+void
+handle_group_msg(PurpleConnection *pc, struct json_object *body)
 {
     struct json_object *gid;
     struct json_object *text;
@@ -84,8 +87,7 @@ void handle_group_msg(PurpleConnection *pc, struct json_object *body)
     if (conv == NULL)
         conv = create_group_conv(pc, id);
 
-    purple_conv_chat_write(PURPLE_CONV_CHAT(conv),
-                           json_object_get_string(sender_name),
-                           json_object_get_string(text),
-                           PURPLE_MESSAGE_RECV, json_object_get_int64(timestamp));
+    serv_got_chat_in(pc, g_str_hash(id),
+                     json_object_get_string(sender_name), PURPLE_MESSAGE_RECV,
+                     json_object_get_string(text), json_object_get_int64(timestamp));
 }
