@@ -18,9 +18,9 @@ init_group_conv_ulist(PurpleConnection *pc, PurpleConversation *conv, char *id)
 {
     struct oicq_conn *oicq = pc->proto_data;
     struct json_object *json_root;
-    struct json_object *members;
-    struct json_object *tmp_obj;
-    size_t n_members;
+    struct json_object *members, *admins, *owner;
+    struct json_object *tmp_obj_1, *tmp_obj_2;
+    size_t n_members, n_admins;
     GList *names = NULL, *flags = NULL;
 
     send_group_members_req(oicq->fd, id);
@@ -28,13 +28,29 @@ init_group_conv_ulist(PurpleConnection *pc, PurpleConversation *conv, char *id)
 
     json_root = json_tokener_parse(oicq->inbuf);
     json_object_object_get_ex(json_root, "list", &members);
+    json_object_object_get_ex(json_root, "owner", &owner);
+    json_object_object_get_ex(json_root, "admin", &admins);
     n_members = json_object_array_length(members);
+    n_admins = json_object_array_length(admins);
 
-    for (int i=0; i<n_members; i++)
-    {
-        tmp_obj = json_object_array_get_idx(members, i);
-        names = g_list_prepend(names, (gpointer)json_object_get_string(tmp_obj));
-        flags = g_list_prepend(flags, GINT_TO_POINTER(0));
+    for (int i=0; i<n_members; i++) {
+        tmp_obj_2 = json_object_array_get_idx(members, i);
+        names = g_list_prepend(names, (gpointer)json_object_get_string(tmp_obj_2));
+        /* 检查是否为管理员 */
+        for (int ii=0; ii<n_admins; ii++) {
+            tmp_obj_1 = json_object_array_get_idx(admins, ii);
+            if (strcmp(json_object_get_string(tmp_obj_1), json_object_get_string(tmp_obj_2)) == 0) {
+                flags = g_list_prepend(flags, GINT_TO_POINTER(PURPLE_CBFLAGS_OP));
+                goto flagsOk;
+            }
+        }
+        /* 检查是否为群主 */
+        if (strcmp(json_object_get_string(owner), json_object_get_string(tmp_obj_2)) == 0) {
+            flags = g_list_prepend(flags, GINT_TO_POINTER(PURPLE_CBFLAGS_FOUNDER));
+            goto flagsOk;
+        }
+        flags = g_list_prepend(flags, GINT_TO_POINTER(PURPLE_CBFLAGS_NONE));
+        flagsOk:
     }
 
     purple_conv_chat_add_users(PURPLE_CONV_CHAT(conv), names, NULL, flags, FALSE);
