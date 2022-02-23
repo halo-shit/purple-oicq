@@ -6,6 +6,7 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <stdio.h>
 
 /**
@@ -14,14 +15,14 @@
  * @returns Socket 连接的结果
  */
 int
-oicq_connect(int* sockfd)
+oicq_connect(int* sockfd, const char* host, const char* port)
 {
     *sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
     struct sockaddr_in oicq;
-    oicq.sin_addr.s_addr = inet_addr("127.0.0.1");
+    oicq.sin_addr.s_addr = inet_addr(host);
 	oicq.sin_family = AF_INET;
-	oicq.sin_port = htons( 9999 );
+	oicq.sin_port = htons( atoi(port) );
 
     return connect(*sockfd , (struct sockaddr *)&oicq , sizeof(oicq));
 }
@@ -33,10 +34,8 @@ oicq_connect(int* sockfd)
  * @returns 初始化结果
  */
 int
-oicq_init(int *sockfd, char* uin)
+oicq_init(int *sockfd, const char* uin)
 {
-    char buffer[256];
-    struct json_object *status;
     struct json_object *json_root;
     json_root = json_object_new_object();
     json_object_object_add(json_root,
@@ -48,13 +47,6 @@ oicq_init(int *sockfd, char* uin)
 
     const char* finalCommand = json_object_to_json_string(json_root);
     return write(*sockfd, finalCommand, strlen(finalCommand));
-
-    read(*sockfd, buffer, 255);
-
-    json_root = json_tokener_parse(buffer);
-    json_object_object_get_ex(json_root, "status", &status);
-
-    return json_object_get_int(status);
 }
 
 /**
@@ -64,7 +56,7 @@ oicq_init(int *sockfd, char* uin)
  * @returns 登录结果
  */
 int
-oicq_login(int *sockfd, char* passwd)
+oicq_login(int *sockfd, const char* passwd)
 {
     struct json_object *json_root;
     json_root = json_object_new_object();
@@ -85,7 +77,7 @@ oicq_login(int *sockfd, char* passwd)
  * @param command 将要发送的命令
  */
 void
-send_command(int sockfd, char* command)
+send_command(int sockfd, const char* command)
 {
     struct json_object *json_root;
     json_root = json_object_new_object();
@@ -124,7 +116,7 @@ oicq_state(int *sockfd)
  * 发送一条好友消息
  */
 void
-send_friend_message(int sockfd, char *uid, struct json_object *message)
+send_friend_message(int sockfd, const char *uid, struct json_object *message)
 {
     struct json_object *json_root;
     json_root = json_object_new_object();
@@ -146,7 +138,7 @@ send_friend_message(int sockfd, char *uid, struct json_object *message)
  * 发送一条纯文本好友消息
  */
 void
-send_friend_plain_message(int sockfd, char *uid, const char *message)
+send_friend_plain_message(int sockfd, const char *uid, const char *message)
 {
     struct json_object *json_root;
     json_root = json_object_new_object();
@@ -169,7 +161,7 @@ send_friend_plain_message(int sockfd, char *uid, const char *message)
  * 发送一条群聊消息
  */
 void
-send_group_message(int sockfd, char *gid, struct json_object *message)
+send_group_message(int sockfd, const char *gid, struct json_object *message)
 {
     struct json_object *json_root;
     json_root = json_object_new_object();
@@ -191,7 +183,7 @@ send_group_message(int sockfd, char *gid, struct json_object *message)
  * 发送一条纯文本群聊消息
  */
 void
-send_group_plain_message(int sockfd, char *gid, const char *message)
+send_group_plain_message(int sockfd, const char *gid, const char *message)
 {
     struct json_object *json_root;
     json_root = json_object_new_object();
@@ -217,7 +209,7 @@ send_group_plain_message(int sockfd, char *gid, const char *message)
  * @param id 不带标识符的 QQ 号
  */
 void
-send_user_info_req(int fd, char *uid)
+send_user_info_req(int fd, const char *uid)
 {
     struct json_object *json_root;
     json_root = json_object_new_object();
@@ -239,7 +231,7 @@ send_user_info_req(int fd, char *uid)
  * @param id 不带标识符的 QQ 群号
  */
 void
-send_group_info_req(int fd, char *id)
+send_group_info_req(int fd, const char *id)
 {
     struct json_object *json_root;
     json_root = json_object_new_object();
@@ -261,7 +253,7 @@ send_group_info_req(int fd, char *id)
  * @param id 不带标识符的 QQ 群号
  */
 void
-send_group_members_req(int fd, char *id)
+send_group_members_req(int fd, const char *id)
 {
     struct json_object *json_root;
     json_root = json_object_new_object();
@@ -276,3 +268,50 @@ send_group_members_req(int fd, char *id)
     write(fd, finalCommand, strlen(finalCommand));
 }
 
+/**
+ * 发送群聊成员查询请求。
+ *
+ * @param fd Socket 的文件标识符
+ * @param id 不带标识符的 QQ 群号
+ * @param name 要查询目标的昵称
+ */
+void
+send_group_member_lookup(int fd, const char *id, const char *name)
+{
+    struct json_object *json_root;
+    json_root = json_object_new_object();
+    json_object_object_add(json_root,
+                           "command",
+                           json_object_new_string("GULOOKUP"));
+    json_object_object_add(json_root,
+                           "id",
+                           json_object_new_string(id));
+    json_object_object_add(json_root,
+                           "nickname",
+                           json_object_new_string(name));
+
+    const char* finalCommand = json_object_to_json_string(json_root);
+    write(fd, finalCommand, strlen(finalCommand));
+}
+
+/**
+ * 发送好友查询请求。
+ *
+ * @param fd Socket 的文件标识符
+ * @param name 要查询目标的昵称
+ */
+void
+send_friend_lookup(int fd, const char *name)
+{
+    struct json_object *json_root;
+    json_root = json_object_new_object();
+    json_object_object_add(json_root,
+                           "command",
+                           json_object_new_string("ULOOKUP"));
+    json_object_object_add(json_root,
+                           "nickname",
+                           json_object_new_string(name));
+
+    const char* finalCommand = json_object_to_json_string(json_root);
+    write(fd, finalCommand, strlen(finalCommand));
+}

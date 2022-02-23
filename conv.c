@@ -68,8 +68,7 @@ PurpleConversation *
 create_friend_conv(PurpleConnection *pc, char* fixed_uid)
 {
     struct oicq_conn *oicq = pc->proto_data;
-    struct json_object *json_root;
-    struct json_object *name;
+    struct json_object *json_root, *name;
     PurpleConversation *conv;
 
     /* 去除末尾的标识符，为获取信息做准备 */

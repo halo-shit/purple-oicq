@@ -145,8 +145,6 @@ prpl_list_icon(PurpleAccount *acct, PurpleBuddy *buddy)
 
 /**
  * 用于获取一份装有对用户可用的状态的列表。
- *
- * 目前只有在线和离线两种。
  */
 static GList *
 prpl_status_types(PurpleAccount *acct)
@@ -154,11 +152,14 @@ prpl_status_types(PurpleAccount *acct)
     GList *types = NULL;
     PurpleStatusType *type;
     /* 加入离线状态 */
-    type = purple_status_type_new(PURPLE_STATUS_OFFLINE, "Offline", NULL,
+    type = purple_status_type_new(PURPLE_STATUS_OFFLINE, "离线", NULL,
             TRUE);
     types = g_list_prepend(types, type);
     /* 加入在线状态 */
-    type = purple_status_type_new(PURPLE_STATUS_AVAILABLE, "Online", NULL,
+    type = purple_status_type_new(PURPLE_STATUS_AVAILABLE, "我在线上", NULL,
+            TRUE);
+    types = g_list_prepend(types, type);
+    type = purple_status_type_new(PURPLE_STATUS_AWAY, "忙碌", NULL,
             TRUE);
     types = g_list_prepend(types, type);
 
@@ -213,7 +214,9 @@ prpl_login(PurpleAccount *acct)
     purple_connection_set_state(pc, PURPLE_CONNECTING);
     purple_connection_update_progress(pc, "连接到后端", 0, 3);
 
-    if (oicq_connect(&sockfd) < 0) {
+    if (oicq_connect(&sockfd,
+                     purple_account_get_string(acct, PRPL_ACCOUNT_OPT_HOST, "127.0.0.1"),
+                     purple_account_get_string(acct, PRPL_ACCOUNT_OPT_PORT, "9999")) < 0) {
         purple_connection_error_reason(pc,
                                     PURPLE_CONNECTION_ERROR_OTHER_ERROR,
                                     "没能连接到 OICQ 服务器");
@@ -360,10 +363,22 @@ prpl_get_cb_real_name(PurpleConnection *gc, int id,
         const char *who)
 {
     PurpleConversation *conv = purple_find_chat(gc, id);
+    struct json_object *json_root, *uid;
+    struct oicq_conn *oicq = gc->proto_data;
+    char *gid = purple_conversation_get_data(conv, "id");
+    char *ret = malloc(12*sizeof(char));
 
     if(conv == NULL)
         return NULL;
-    return "test";
+    send_group_member_lookup(oicq->fd, gid, who);
+
+    read(oicq->fd, oicq->inbuf, GENERAL_BUF_SIZE);
+
+    json_root = json_tokener_parse(oicq->inbuf);
+    json_object_object_get_ex(json_root, "uid", &uid);
+    strcpy(ret, json_object_get_string(uid));
+
+    return ret;
 }
 
 /**
@@ -469,10 +484,28 @@ static PurplePluginProtocolInfo prpl_info =
 static void
 prpl_init(PurplePlugin *plugin)
 {
+    struct _PurpleKeyValuePair *pair0, *pair1, *pair2;
+    GList *login_options = NULL;
     GList *protocol_options = NULL;
 
-    purple_debug_info(PRPL_ID, "starting up\n");
+    pair0 = g_new0(struct _PurpleKeyValuePair, 1);
+    pair1 = g_new0(struct _PurpleKeyValuePair, 1);
+    pair2 = g_new0(struct _PurpleKeyValuePair, 1);
 
+    pair0->key = "密码登录";
+    pair0->value = PRPL_ACCOUNT_OPT_USE_PASSWORD;
+    pair1->key = "扫码登录";
+    pair1->value = PRPL_ACCOUNT_OPT_USE_QRCODE;
+    pair2->key = "扫码登录（单次）";
+    pair2->value = PRPL_ACCOUNT_OPT_USE_QRCODE_ONCE;
+
+    login_options = g_list_append(login_options, pair0);
+    login_options = g_list_append(login_options, pair1);
+    login_options = g_list_append(login_options, pair2);
+
+    protocol_options = g_list_append(protocol_options,
+            purple_account_option_list_new("登录方式", PRPL_ACCOUNT_OPT_LOGIN,
+                    login_options));
     protocol_options = g_list_append(protocol_options,
             purple_account_option_string_new(
                     "服务器主机名", PRPL_ACCOUNT_OPT_HOST,
@@ -480,11 +513,7 @@ prpl_init(PurplePlugin *plugin)
     protocol_options = g_list_append(protocol_options,
             purple_account_option_string_new(
                     "服务器端口号", PRPL_ACCOUNT_OPT_PORT,
-                    "9000"));
-    protocol_options = g_list_append(protocol_options,
-            purple_account_option_bool_new(
-                    "启用 TLS", PRPL_ACCOUNT_OPT_TLS,
-                    FALSE));
+                    "9999"));
 
     prpl_info.protocol_options = protocol_options;
 }
@@ -501,12 +530,12 @@ static PurplePluginInfo info = {
 
     "prpl-hammer-oicq",
     "OICQ",
-    "0.0.1",
+    DISPLAY_VERSION,
 
     "A binding to takayama-lily's OICQ library.",
     "A binding to takayama-lily's OICQ library. Require a OICQ daemon to function correctly.",
-    "Williams Goodspeed <goodspeed@anche.no>",
-    "http://github.com",
+    "axon-oicq@riseup.net",
+    PRPL_WEBSITE,
 
     NULL,
     NULL,
