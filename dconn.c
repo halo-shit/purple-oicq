@@ -113,6 +113,25 @@ oicq_state(int *sockfd)
 }
 
 /**
+ * 发送窗口抖动
+ */
+void
+send_friend_poke(int sockfd, const char *uid)
+{
+    struct json_object *json_root;
+    json_root = json_object_new_object();
+    json_object_object_add(json_root,
+                           "command",
+                           json_object_new_string("USEND_SHAKE"));
+    json_object_object_add(json_root,
+                           "uid",
+                           json_object_new_string(uid));
+
+    const char* finalCommand = json_object_to_json_string(json_root);
+    write(sockfd, finalCommand, strlen(finalCommand));
+}
+
+/**
  * 发送一条好友消息
  */
 void
@@ -203,19 +222,19 @@ send_group_plain_message(int sockfd, const char *gid, const char *message)
 
 
 /**
- * 发送好友信息请求。
+ * 发送帐号信息请求。
  *
  * @param fd Socket 的文件标识符
  * @param id 不带标识符的 QQ 号
  */
 void
-send_user_info_req(int fd, const char *uid)
+send_info_req_by_id(int fd, const char *uid)
 {
     struct json_object *json_root;
     json_root = json_object_new_object();
     json_object_object_add(json_root,
                            "command",
-                           json_object_new_string("UINFO"));
+                           json_object_new_string("IDINFO"));
     json_object_object_add(json_root,
                            "uid",
                            json_object_new_string(uid));
@@ -269,45 +288,19 @@ send_group_members_req(int fd, const char *id)
 }
 
 /**
- * 发送群聊成员查询请求。
- *
- * @param fd Socket 的文件标识符
- * @param id 不带标识符的 QQ 群号
- * @param name 要查询目标的昵称
- */
-void
-send_group_member_lookup(int fd, const char *id, const char *name)
-{
-    struct json_object *json_root;
-    json_root = json_object_new_object();
-    json_object_object_add(json_root,
-                           "command",
-                           json_object_new_string("GULOOKUP"));
-    json_object_object_add(json_root,
-                           "id",
-                           json_object_new_string(id));
-    json_object_object_add(json_root,
-                           "nickname",
-                           json_object_new_string(name));
-
-    const char* finalCommand = json_object_to_json_string(json_root);
-    write(fd, finalCommand, strlen(finalCommand));
-}
-
-/**
  * 发送好友查询请求。
  *
  * @param fd Socket 的文件标识符
  * @param name 要查询目标的昵称
  */
 void
-send_friend_lookup(int fd, const char *name)
+send_lookup_nickname(int fd, const char *name)
 {
     struct json_object *json_root;
     json_root = json_object_new_object();
     json_object_object_add(json_root,
                            "command",
-                           json_object_new_string("ULOOKUP"));
+                           json_object_new_string("LOOKUP"));
     json_object_object_add(json_root,
                            "nickname",
                            json_object_new_string(name));

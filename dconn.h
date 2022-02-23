@@ -7,6 +7,8 @@ int oicq_connect(int*, const char*, const char*);
 
 void send_command(int, const char*);
 
+void send_friend_poke(int, const char*);
+
 void send_friend_message(int, const char*, struct json_object*);
 
 void send_friend_plain_message(int, const char*, const char*);
@@ -15,15 +17,13 @@ void send_group_message(int, const char*, struct json_object*);
 
 void send_group_plain_message(int, const char*, const char*);
 
-void send_user_info_req(int, const char*);
+void send_info_req_by_id(int, const char*);
 
 void send_group_info_req(int, const char*);
 
 void send_group_members_req(int, const char*);
 
-void send_group_member_lookup(int, const char*, const char*);
-
-void send_friend_lookup(int, const char*);
+void send_lookup_nickname(int, const char*);
 
 int oicq_init(int*, const char*);
 

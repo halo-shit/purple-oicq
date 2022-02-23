@@ -6,6 +6,27 @@
 #include "dconn.h"
 #include "oicq.h"
 
+void init_im_conv(PurpleConnection *pc, PurpleConversation *conv)
+{
+        char *uname = (char*) malloc(32*sizeof(char));
+        char *store_id = (char*) malloc(12*sizeof(char));
+        struct oicq_conn *oicq = pc->proto_data;
+        struct json_object *json_root, *name;
+
+        strcpy(store_id, purple_conversation_get_name(conv));
+        purple_conversation_set_data(conv, "uid", store_id);
+        /* 补全 IM 信息 */
+        send_info_req_by_id(oicq->fd, store_id);
+        read(oicq->fd, oicq->inbuf, GENERAL_BUF_SIZE);
+
+        json_root = json_tokener_parse(oicq->inbuf);
+        json_object_object_get_ex(json_root, "nickname", &name);
+        strncpy(uname, json_object_get_string(name), 32);
+
+        purple_conversation_set_data(conv, "uname", uname);
+        purple_conversation_set_name(conv, uname);
+}
+
 /**
  * 初始化群聊的用户列表，Pidgin 不会提示。
  *
@@ -79,11 +100,11 @@ create_friend_conv(PurpleConnection *pc, char* fixed_uid)
 
     // conv = serv_got_joined_chat(pc, g_str_hash(fixed_uid), fixed_uid);
 
-    send_user_info_req(oicq->fd, uid);
+    send_info_req_by_id(oicq->fd, uid);
 
     read(oicq->fd, oicq->inbuf, GENERAL_BUF_SIZE);
     json_root = json_tokener_parse(oicq->inbuf);
-    json_object_object_get_ex(json_root, "name", &name);
+    json_object_object_get_ex(json_root, "nickname", &name);
     strncpy(uname, json_object_get_string(name), 32);
 
     conv = purple_conversation_new(PURPLE_CONV_TYPE_IM,

@@ -365,12 +365,11 @@ prpl_get_cb_real_name(PurpleConnection *gc, int id,
     PurpleConversation *conv = purple_find_chat(gc, id);
     struct json_object *json_root, *uid;
     struct oicq_conn *oicq = gc->proto_data;
-    char *gid = purple_conversation_get_data(conv, "id");
     char *ret = malloc(12*sizeof(char));
 
     if(conv == NULL)
         return NULL;
-    send_group_member_lookup(oicq->fd, gid, who);
+    send_lookup_nickname(oicq->fd, who);
 
     read(oicq->fd, oicq->inbuf, GENERAL_BUF_SIZE);
 
@@ -391,6 +390,63 @@ prpl_actions(PurplePlugin *plugin, gpointer context)
 
   return list;
 }
+
+static GList *
+prpl_attention_types(PurpleAccount *acct)
+{
+    /* 初始化窗口抖动 */
+    PurpleAttentionType *pat;
+    pat = purple_attention_type_new("shake", "shake",
+                                    "您收到了一个窗口抖动！",
+                                    "您发送了一个窗口抖动！");
+    return g_list_append(NULL, pat);
+}
+
+static gboolean
+prpl_send_attention(PurpleConnection *pc, const char *who, guint type)
+{
+    PurpleConversation *conv = purple_find_conversation_with_account(PURPLE_CONV_TYPE_IM, who, pc->account);
+
+    readinfo:
+    struct oicq_conn *oicq = pc->proto_data;
+    char *uid = purple_conversation_get_data(conv, "uid");
+
+    if (uid == NULL) {
+        init_im_conv(pc, conv);
+        goto readinfo;
+    }
+
+    send_friend_poke(oicq->fd, uid);
+    return TRUE;
+}
+
+static void
+prpl_get_info(PurpleConnection *pc, const char *who)
+{
+    struct oicq_conn *oicq = pc->proto_data;
+    struct json_object *json_root, *uid, *sex;
+    PurpleNotifyUserInfo *user_info;
+
+    /* 获取对应的 QQ 号 */
+    send_lookup_nickname(oicq->fd, who);
+    read(oicq->fd, oicq->inbuf, GENERAL_BUF_SIZE);
+    json_root = json_tokener_parse(oicq->inbuf);
+    json_object_object_get_ex(json_root, "uid", &uid);
+
+    /* 获取对应用户的信息 */
+    send_info_req_by_id(oicq->fd, json_object_get_string(uid));
+    read(oicq->fd, oicq->inbuf, GENERAL_BUF_SIZE);
+    json_root = json_tokener_parse(oicq->inbuf);
+    json_object_object_get_ex(json_root, "sex", &sex);
+
+    user_info = purple_notify_user_info_new();
+    purple_notify_user_info_add_pair(user_info, "替代昵称", who);
+    purple_notify_user_info_add_pair(user_info, "QQ号", json_object_get_string(uid));
+    purple_notify_user_info_add_pair(user_info, "性别", json_object_get_string(sex));
+
+    purple_notify_userinfo(pc, who, user_info, NULL, NULL);
+}
+
 
 /* 协议描述 */
 static PurplePluginProtocolInfo prpl_info =
@@ -422,7 +478,7 @@ static PurplePluginProtocolInfo prpl_info =
     prpl_im_send,                          /* 发送 IM */
     NULL,                                  /* 设置信息 */
     NULL,                                  /* 发送正在输入 */
-    NULL,                                  /* 获取信息 */
+    prpl_get_info,                         /* 获取信息 */
     NULL,                                  /* 设置状态 */
     NULL,                                  /* 设置Idle */
     NULL,                                  /* 修改密码 */
@@ -468,8 +524,8 @@ static PurplePluginProtocolInfo prpl_info =
     NULL,                                  /* RAW 发送 */
     NULL,                                  /* 房间列表房间序列化 */
     NULL,                                  /* 注销用户 */
-    NULL,                                  /* 发送Attention */
-    NULL,                                  /* 获取Attention类别 */
+    prpl_send_attention,                   /* 发送Attention */
+    prpl_attention_types,                  /* 获取Attention类别 */
     sizeof(PurplePluginProtocolInfo),      /* 结构体大小 */
     NULL,                                  /* 获取用户文本表 */
     NULL,                                  /* initiate_media */
@@ -484,6 +540,7 @@ static PurplePluginProtocolInfo prpl_info =
 static void
 prpl_init(PurplePlugin *plugin)
 {
+    /* 初始化协议选项 */
     struct _PurpleKeyValuePair *pair0, *pair1, *pair2;
     GList *login_options = NULL;
     GList *protocol_options = NULL;

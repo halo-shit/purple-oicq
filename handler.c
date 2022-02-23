@@ -17,22 +17,7 @@ handle_im_send(PurpleConnection *pc, PurpleConversation *conv, const char *text)
     char *uid = purple_conversation_get_data(conv, "uid");
 
     if (uid == NULL) {
-        char *uname = (char*) malloc(32*sizeof(char));
-        char *store_id = (char*) malloc(12*sizeof(char));
-        struct json_object *json_root, *name;
-
-        strcpy(store_id, purple_conversation_get_name(conv));
-        purple_conversation_set_data(conv, "uid", store_id);
-        /* 补全 IM 信息 */
-        send_user_info_req(oicq->fd, store_id);
-        read(oicq->fd, oicq->inbuf, GENERAL_BUF_SIZE);
-
-        json_root = json_tokener_parse(oicq->inbuf);
-        json_object_object_get_ex(json_root, "name", &name);
-        strncpy(uname, json_object_get_string(name), 32);
-
-        purple_conversation_set_data(conv, "uname", uname);
-        purple_conversation_set_name(conv, uname);
+        init_im_conv(pc, conv);
         goto readinfo;
     }
 
@@ -66,11 +51,9 @@ handle_friend_msg(PurpleConnection *pc, struct json_object *body)
     struct json_object *timestamp;
     PurpleConversation *conv;
     char id[12];
-
     json_object_object_get_ex(body, "sender", &uid);
     json_object_object_get_ex(body, "text", &text);
     json_object_object_get_ex(body, "time", &timestamp);
-
     /* 获取字符串形式的 QQ 帐号 */
     snprintf(id, 12, "%ldd", json_object_get_int64(uid));
 
@@ -78,7 +61,6 @@ handle_friend_msg(PurpleConnection *pc, struct json_object *body)
                                                  id, pc->account);
     if (conv == NULL)
         conv = create_friend_conv(pc, id);
-
     const char *uname = purple_conversation_get_data(conv, "uname");
     serv_got_im(pc, uname,
                 json_object_get_string(text),

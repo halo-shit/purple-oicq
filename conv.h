@@ -9,4 +9,6 @@ PurpleConversation* create_group_conv(PurpleConnection*, char*);
 
 void init_group_conv_ulist(PurpleConnection*, PurpleConversation*, char*);
 
+void init_im_conv(PurpleConnection*, PurpleConversation*);
+
 #endif // CONV_H_INCLUDED
