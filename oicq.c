@@ -152,14 +152,14 @@ prpl_status_types(PurpleAccount *acct)
     GList *types = NULL;
     PurpleStatusType *type;
     /* 加入离线状态 */
-    type = purple_status_type_new(PURPLE_STATUS_OFFLINE, "离线", NULL,
+    type = purple_status_type_new(PURPLE_STATUS_OFFLINE, "offline", "离线",
             TRUE);
     types = g_list_prepend(types, type);
     /* 加入在线状态 */
-    type = purple_status_type_new(PURPLE_STATUS_AVAILABLE, "我在线上", NULL,
+    type = purple_status_type_new(PURPLE_STATUS_AVAILABLE, "online", "我在线上",
             TRUE);
     types = g_list_prepend(types, type);
-    type = purple_status_type_new(PURPLE_STATUS_AWAY, "忙碌", NULL,
+    type = purple_status_type_new(PURPLE_STATUS_AWAY, "busy", "忙碌",
             TRUE);
     types = g_list_prepend(types, type);
 
@@ -447,6 +447,14 @@ prpl_get_info(PurpleConnection *pc, const char *who)
     purple_notify_userinfo(pc, who, user_info, NULL, NULL);
 }
 
+static void
+prpl_add_buddy(PurpleConnection *pc, PurpleBuddy *buddy, PurpleGroup *group)
+{
+    purple_prpl_got_user_status(pc->account, buddy->name, "online", NULL);
+
+    // purple_account_request_add(pc->account, buddy->name, NULL, NULL, NULL);
+}
+
 
 /* 协议描述 */
 static PurplePluginProtocolInfo prpl_info =
@@ -482,7 +490,7 @@ static PurplePluginProtocolInfo prpl_info =
     NULL,                                  /* 设置状态 */
     NULL,                                  /* 设置Idle */
     NULL,                                  /* 修改密码 */
-    NULL,                                  /* 加好友 */
+    prpl_add_buddy,                        /* 加好友 */
     NULL,                                  /* 加好友 */
     NULL,                                  /* 删好友 */
     NULL,                                  /* 删好友 */
