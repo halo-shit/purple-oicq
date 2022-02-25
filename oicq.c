@@ -50,6 +50,54 @@ do_event_check_cb(gpointer data, gint source, PurpleInputCondition _)
 }
 
 static void
+do_buddies_sync_check_cb(gpointer data, gint source, PurpleInputCondition _)
+{
+    int n_friends;
+    PurpleGroup *group;
+    PurpleBuddy *buddy;
+    const char *s_name, *s_id;
+    PurpleConnection *pc = data;
+    struct json_object *name, *id;
+    struct json_object *json_root, *name_list, *id_list;
+    struct oicq_conn *oicq = pc->proto_data;
+
+    read(sockfd, oicq->inbuf, GENERAL_BUF_SIZE);
+    json_root = json_tokener_parse(oicq->inbuf);
+
+    json_object_object_get_ex(json_root, "list", &name_list);
+    json_object_object_get_ex(json_root, "idlist", &id_list);
+    n_friends = json_object_array_length(name_list);
+
+    group = purple_find_group(PRPL_SYNC_GROUP);
+    if (group == NULL) {
+        group = purple_group_new(PRPL_SYNC_GROUP);
+        purple_blist_add_group(group, NULL);
+    }
+
+    for (int i=0; i<n_friends; i++) {
+        id = json_object_array_get_idx(id_list, i);
+        s_id = json_object_get_string(id);
+        name = json_object_array_get_idx(name_list, i);
+        s_name = json_object_get_string(name);
+        /* 若用户已存在，则直接设置在线状态 */
+        if (purple_find_buddy(pc->account, json_object_get_string(id))) {
+            purple_prpl_got_user_status(pc->account, s_id, "online", NULL);
+            continue;
+        }
+        /* 不显示 BabyQ */
+        if (strcmp(s_id, "66600000"))
+            continue;
+        buddy = purple_buddy_new(pc->account, s_id, s_name);
+        purple_blist_add_buddy(buddy, NULL, group, NULL);
+    }
+
+    purple_input_remove(pc->inpa);
+    purple_connection_set_state(pc, PURPLE_CONNECTED);
+    /* 监听 Socket 连接，向 cb 传入 PurpleConnection */
+    pc->inpa = purple_input_add(oicq->fd, PURPLE_INPUT_READ, do_event_check_cb, pc);
+}
+
+static void
 do_whoami_check_cb(gpointer data, gint source, PurpleInputCondition _)
 {
     PurpleConnection *pc = data;
@@ -73,9 +121,10 @@ do_whoami_check_cb(gpointer data, gint source, PurpleInputCondition _)
     oicq->whoami = json_object_get_string(status);
 
     purple_input_remove(pc->inpa);
-    purple_connection_set_state(pc, PURPLE_CONNECTED);
-    /* 监听 Socket 连接，向 cb 传入 PurpleConnection */
-    pc->inpa = purple_input_add(oicq->fd, PURPLE_INPUT_READ, do_event_check_cb, pc);
+    /* 步骤五：同步好友列表 */
+    purple_connection_update_progress(pc, "同步好友列表", 4, 5);
+    send_command(oicq->fd, "FLIST");
+    pc->inpa = purple_input_add(oicq->fd, PURPLE_INPUT_READ, do_buddies_sync_check_cb, pc);
 }
 
 static void
@@ -99,7 +148,7 @@ do_login_check_cb(gpointer data, gint source, PurpleInputCondition _)
     }
     purple_input_remove(pc->inpa);
     /* 步骤四：我是谁？ */
-    purple_connection_update_progress(pc, "查询身份", 2, 4);
+    purple_connection_update_progress(pc, "查询身份", 3, 5);
     send_command(sockfd, "WHOAMI");
     pc->inpa = purple_input_add(oicq->fd, PURPLE_INPUT_READ, do_whoami_check_cb, pc);
 }
@@ -126,7 +175,7 @@ do_init_check_cb(gpointer data, gint source, PurpleInputCondition _)
 
     purple_input_remove(pc->inpa);
     /* 步骤三：登录到 QQ 服务 */
-    purple_connection_update_progress(pc, "登录到 QQ", 2, 4);
+    purple_connection_update_progress(pc, "登录到 QQ", 2, 5);
     oicq_login(&sockfd, pc->account->password);
     pc->inpa = purple_input_add(oicq->fd, PURPLE_INPUT_READ, do_login_check_cb, pc);
 }
@@ -212,7 +261,7 @@ prpl_login(PurpleAccount *acct)
     /* 步骤一：连接到 Axon */
     purple_debug_info(PRPL_ID, "connecting to Axon\n");
     purple_connection_set_state(pc, PURPLE_CONNECTING);
-    purple_connection_update_progress(pc, "连接到后端", 0, 3);
+    purple_connection_update_progress(pc, "连接到后端", 0, 5);
 
     if (oicq_connect(&sockfd,
                      purple_account_get_string(acct, PRPL_ACCOUNT_OPT_HOST, "127.0.0.1"),
@@ -233,7 +282,7 @@ prpl_login(PurpleAccount *acct)
 
     /* 步骤二：初始化 OICQ 客户端 */
     purple_debug_info(PRPL_ID, "initializing\n");
-    purple_connection_update_progress(pc, "初始化客户端", 1, 3);
+    purple_connection_update_progress(pc, "初始化客户端", 1, 5);
     oicq_init(&sockfd, acct->username);
     pc->inpa = purple_input_add(oicq->fd, PURPLE_INPUT_READ, do_init_check_cb, pc);
 }

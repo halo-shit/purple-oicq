@@ -31,5 +31,7 @@ struct oicq_conn {
 #define PRPL_ACCOUNT_OPT_USE_QRCODE      "qrcode"
 #define PRPL_ACCOUNT_OPT_USE_QRCODE_ONCE "qrcode-once"
 
+#define PRPL_SYNC_GROUP "好友列表"
+
 
 #endif // _OICQ_H_
