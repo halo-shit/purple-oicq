@@ -2,14 +2,14 @@
 
 COMPILE.c = $(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
 
-CFLAGS += -Wall -g -O0
+CFLAGS += -Wall -O0
 CFLAGS += -DPURPLE_PLUGINS
 CFLAGS += -DGLIB_DISABLE_DEPRECATION_WARNINGS
 
 # generate .d files when compiling
 CPPFLAGS += -MMD
 
-OBJECTS = oicq.o dconn.o handler.o conv.o
+OBJECTS = oicq.o axon.o event.o login.o chat.o
 
 all: $(TARGET)
 clean:
@@ -22,6 +22,10 @@ install:
 	    mkdir -p $(DESTDIR)$(DATA_ROOT_DIR_PURPLE)/pixmaps/pidgin/protocols/$$i; \
 	    install -m 664 oicq-$${i}px.png $(DESTDIR)$(DATA_ROOT_DIR_PURPLE)/pixmaps/pidgin/protocols/$$i/oicq.png; \
 	done
+
+test_install:
+	install -m 664 $(TARGET) ~/.purple/plugins
+
 
 $(TARGET): $(OBJECTS)
 	$(LINK.o) -shared $^ $(LOADLIBES) $(LDLIBS) -o $@

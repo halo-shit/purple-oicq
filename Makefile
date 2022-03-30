@@ -9,7 +9,7 @@ PKG_CFLAGS:=$(shell $(PKG_CONFIG) --cflags $(LIBS) || echo "FAILED")
 ifeq ($(PKG_CFLAGS),FAILED)
 	$(error "$(PKG_CONFIG) failed")
 endif
-CFLAGS+=$(PKG_CFLAGS) -fPIC -DPIC
+CFLAGS+=$(PKG_CFLAGS) -fPIC -DPIC -g
 
 PKG_LDLIBS:=$(shell $(PKG_CONFIG) --libs $(LIBS) || echo "FAILED")
 ifeq ($(PKG_LDLIBS),FAILED)
