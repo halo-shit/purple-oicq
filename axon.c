@@ -74,10 +74,21 @@ axon_client_init(int sockfd, const char *self_id, const char *platform)
 }
 
 void
-axon_client_login(int sockfd, const char *passwd)
+axon_client_password_login(int sockfd, const char *passwd)
 {
 	Data j = data_new();
+	data_set_param(j, "method", "0");
 	data_set_param(j, "passwd", passwd);
+	data_set_cmd(j, "LOGIN");
+	data_write_to_fd(j, sockfd);
+	data_free(j);
+}
+
+void
+axon_client_qrcode_login(int sockfd)
+{
+	Data j = data_new();
+	data_set_param(j, "method", "1");
 	data_set_cmd(j, "LOGIN");
 	data_write_to_fd(j, sockfd);
 	data_free(j);

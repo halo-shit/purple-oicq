@@ -1,4 +1,5 @@
 #include "login.h"
+#include "account.h"
 #include "axon.h"
 #include "blist.h"
 #include "common.h"
@@ -6,6 +7,7 @@
 #include "conversation.h"
 #include "event.h"
 #include "json_object.h"
+#include "notify.h"
 #include <string.h>
 
 #include <glib.h>
@@ -135,6 +137,13 @@ axon_client_whoami_ok(PurpleConnection *pc, gpointer _, Data response)
 void
 axon_client_login_ok(PurpleConnection *pc, gpointer _, Data __)
 {
+	/* 将单次扫码登录改为密码登录 */
+	if (STR_IS_EQUAL(purple_account_get_string(pc->account,
+	    PRPL_ACCT_OPT_LOGIN, PRPL_ACCT_OPT_USE_PASSWORD),
+	    PRPL_ACCT_OPT_USE_QRCODE_ONCE))
+		purple_account_set_string(pc->account, PRPL_ACCT_OPT_LOGIN,
+		    PRPL_ACCT_OPT_USE_PASSWORD);
+
 	PD_FROM_PTR(pc->proto_data);
 
 	DEBUG_LOG("login ok, wating for next procedure");
@@ -163,5 +172,14 @@ axon_client_init_ok(PurpleConnection *pc, gpointer _, Data __)
 	w->err  = purple_login_err;
 	g_queue_push_tail(pd->queue, w);
 
-	axon_client_login(pd->fd, pc->account->password);
+	/* 登录方式检查 */
+	if (STR_IS_EQUAL(purple_account_get_string(pc->account,
+	    PRPL_ACCT_OPT_LOGIN, PRPL_ACCT_OPT_USE_PASSWORD),
+	    PRPL_ACCT_OPT_USE_PASSWORD))
+		axon_client_password_login(pd->fd, pc->account->password);
+	else {
+		purple_notify_info(pc, "提示", "请到 AXON 所在的控制台查看对应的二维码，"
+		    "并在扫描后敲击 Enter 键继续。", NULL);
+		axon_client_qrcode_login(pd->fd);
+	}
 }

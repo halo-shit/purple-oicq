@@ -19,12 +19,19 @@ int axon_connect(const char *, const char *);
 void axon_client_init(int, const char *, const char *);
 
 /**
- * 使 Axon 客户端登录到 QQ 服务器。
+ * 使 Axon 客户端登录到 QQ 服务器（密码登录）。
  *
  * @param sockfd Socket 文件描述符
  * @param passwd 密码（或 16 位 MD5 字符串）
  */
-void axon_client_login(int, const char *);
+void axon_client_password_login(int, const char *);
+
+/**
+ * 使 Axon 客户端登录到 QQ 服务器（扫码登录）。
+ *
+ * @param sockfd Socket 文件描述符
+ */
+void axon_client_qrcode_login(int);
 
 /**
  * 调用一条不含参数的命令。
