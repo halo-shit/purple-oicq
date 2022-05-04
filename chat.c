@@ -15,14 +15,52 @@
 #include "eventloop.h"
 #include "glibconfig.h"
 #include "json_object.h"
+#include "notify.h"
 #include "server.h"
 #include "chat.h"
+#include "util.h"
 
 struct message {
 	PurpleConversation *conv;
 	ProtoData *pd;
 	char *text;
 };
+
+void
+lookup_ok(PurpleConnection *pc, gpointer who, Data data)
+{
+	PurpleNotifyUserInfo *user_info = purple_notify_user_info_new();
+	Data field;
+
+	json_object_object_get_ex(data, "relation", &field);
+	purple_notify_user_info_prepend_pair(user_info, "加入的群聊",
+	    json_object_get_string(field));
+
+	json_object_object_get_ex(data, "sex", &field);
+	purple_notify_user_info_prepend_pair(user_info, "性别",
+	    json_object_get_string(field));
+
+	json_object_object_get_ex(data, "card", &field);
+	purple_notify_user_info_prepend_pair(user_info, "群名片(昵称)",
+	    json_object_get_string(field));
+
+	json_object_object_get_ex(data, "id", &field);
+	purple_notify_user_info_prepend_pair(user_info, "帐号",
+	    json_object_get_string(field));
+
+	json_object_object_get_ex(data, "nickname", &field);
+	purple_notify_user_info_prepend_pair(user_info, "昵称",
+	    json_object_get_string(field));
+
+	purple_notify_userinfo(pc, who, user_info, NULL, NULL);
+	g_free(user_info);
+}
+
+void
+lookup_err(PurpleConnection *pc, gpointer _, Data __)
+{
+	purple_notify_error(pc, "错误", "用户信息查询失败！请检查程序日志。", NULL);
+}
 
 void
 u2c_message_ok(PurpleConnection *pc, gpointer data, Data _)
@@ -59,13 +97,14 @@ u2c_message_send(PurpleConnection *pc, PurpleConversation *conv,
 	NEW_WATCHER_W();
 	PD_FROM_PTR(pc->proto_data);
 	struct message *d = g_new0(struct message, 1);
-	char *msg;
+	char *unescaped_msg, *original_msg;
 
 	/* 原始的消息会被释放，所以得到一份拷贝。 */
-	CLONE_STR(msg, message);
+	CLONE_STR(unescaped_msg, purple_unescape_text(message));
+	CLONE_STR(original_msg, message);
 
 	d->conv = conv;
-	d->text = msg;
+	d->text = original_msg;
 	d->pd   = pd;
 
 	w->ok   = u2c_message_ok;
@@ -75,7 +114,9 @@ u2c_message_send(PurpleConnection *pc, PurpleConversation *conv,
 
 	char *s_id = g_malloc0(sizeof(char)*12);
 	sprintf(s_id, "%d", purple_conv_chat_get_id(PURPLE_CONV_CHAT(conv)));
-	axon_client_gsend_plain(pd->fd, s_id, message);
+	axon_client_gsend_plain(pd->fd, s_id, unescaped_msg);
+	g_free(s_id);
+	g_free(unescaped_msg);
 }
 
 void
@@ -112,13 +153,14 @@ u2u_message_send(PurpleConnection *pc, PurpleConversation *conv,
 	NEW_WATCHER_W();
 	PD_FROM_PTR(pc->proto_data);
 	struct message *d = g_new0(struct message, 1);
-	char *msg;
+	char *unescaped_msg, *original_msg;
 
 	/* 原始的消息会被释放，所以得到一份拷贝。 */
-	CLONE_STR(msg, message);
+	CLONE_STR(unescaped_msg, purple_unescape_text(message));
+	CLONE_STR(original_msg, message);
 
 	d->conv = conv;
-	d->text = msg;
+	d->text = original_msg;
 	d->pd   = pd;
 
 	w->ok   = u2u_message_ok;
@@ -127,7 +169,8 @@ u2u_message_send(PurpleConnection *pc, PurpleConversation *conv,
 
 	g_queue_push_tail(pd->queue, w);
 	axon_client_fsend_plain(pd->fd,
-	    purple_conversation_get_name(conv), message);
+	    purple_conversation_get_name(conv), unescaped_msg);
+	g_free(unescaped_msg);
 }
 
 void

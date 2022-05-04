@@ -23,7 +23,7 @@ install:
 	    install -m 664 oicq-$${i}px.png $(DESTDIR)$(DATA_ROOT_DIR_PURPLE)/pixmaps/pidgin/protocols/$$i/oicq.png; \
 	done
 
-test_install:
+test_install: $(TARGET)
 	install -m 664 $(TARGET) ~/.purple/plugins
 
 

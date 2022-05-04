@@ -177,9 +177,13 @@ axon_client_init_ok(PurpleConnection *pc, gpointer _, Data __)
 	    PRPL_ACCT_OPT_LOGIN, PRPL_ACCT_OPT_USE_PASSWORD),
 	    PRPL_ACCT_OPT_USE_PASSWORD))
 		axon_client_password_login(pd->fd, pc->account->password);
-	else {
+	else if (STR_IS_EQUAL(purple_account_get_string(pc->account,
+	    PRPL_ACCT_OPT_LOGIN, PRPL_ACCT_OPT_USE_PASSWORD),
+	    PRPL_ACCT_OPT_USE_QRCODE_ONCE)) {
 		purple_notify_info(pc, "提示", "请到 AXON 所在的控制台查看对应的二维码，"
 		    "并在扫描后敲击 Enter 键继续。", NULL);
+		axon_client_qrcode_login(pd->fd);
+	} else {
 		axon_client_qrcode_login(pd->fd);
 	}
 }

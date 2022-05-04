@@ -51,7 +51,7 @@ prpl_status_types(PurpleAccount *acct)
 	return types;
 }
 
-/* 获取需要填写的群聊信息 [WIP] */
+/* 获取需要填写的群聊信息 */
 static GList *
 prpl_chat_info(PurpleConnection *pc)
 {
@@ -93,6 +93,7 @@ prpl_close(PurpleConnection *pc)
 	PD_FROM_PTR(pc->proto_data);
 
 	DEBUG_LOG("closing axon connection");
+	purple_input_remove(pc->inpa);
 	close(pd->fd);
 
 	DEBUG_LOG("freeing resources");
@@ -241,6 +242,20 @@ prpl_set_status(PurpleAccount *acct, PurpleStatus *status)
 	g_queue_push_tail(pd->queue, watcher_nil());
 }
 
+void
+prpl_get_info(PurpleConnection *pc, const char *who)
+{
+	DEBUG_LOG("lookup user");
+	PD_FROM_PTR(pc->proto_data);
+	NEW_WATCHER_W();
+
+	w->data = (gpointer) who;
+	w->ok   = lookup_ok;
+	w->err  = lookup_err;
+	g_queue_push_tail(pd->queue, w);
+	axon_client_lookup_nickname(pd->fd, who);
+}
+
 /* 协议描述 */
 static PurplePluginProtocolInfo prpl_info =
 {
@@ -270,8 +285,7 @@ static PurplePluginProtocolInfo prpl_info =
 	prpl_im_send,			   /* 发送私聊消息 */
 	NULL,				   /* 设置信息 */
 	NULL,				   /* 发送正在输入 */
-	NULL,
-	// prpl_get_info,			   /* 获取信息 */
+	prpl_get_info,			   /* 获取信息 */
 	prpl_set_status,		   /* 设置状态 */
 	NULL,				   /* 设置Idle */
 	NULL,				   /* 修改密码 */

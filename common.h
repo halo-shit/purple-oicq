@@ -44,7 +44,8 @@ void data_set_param(Data, const char *, const char *);
 #define PRPL_SYNC_GROUP_CHAT  "群聊列表"
 #define PRPL_ID "purple-oicq"
 
-#define DEBUG_LOG(x) purple_debug_info(PRPL_ID, "%s\n", x)
+#define DEBUG_LOG(x...) purple_debug_info(PRPL_ID, "%s(%d): %s\n", \
+    __FUNCTION__, __LINE__, ## x)
 #define PD_FROM_PTR(ptr) ProtoData *pd = ptr
 #define NEW_WATCHER_W() Watcher *w = g_new(Watcher, 1)
 #define CLONE_STR(dest, src) dest = g_malloc0(sizeof(char)*strlen(src)+1); \

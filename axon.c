@@ -107,7 +107,7 @@ void
 axon_client_fsend_shake(int sockfd, const char *id)
 {
 	Data j = data_new();
-	data_set_param(j, "nick", id);
+	data_set_param(j, "id", id);
 	data_set_cmd(j, "USEND_SHAKE");
 	data_write_to_fd(j, sockfd);
 	data_free(j);
@@ -118,7 +118,7 @@ axon_client_fsend_plain(int sockfd, const char *id, const char *message)
 {
 	Data j = data_new();
 	data_set_param(j, "message", message);
-	data_set_param(j, "nick", id);
+	data_set_param(j, "id", id);
 	data_set_cmd(j, "USEND");
 	data_write_to_fd(j, sockfd);
 	data_free(j);
