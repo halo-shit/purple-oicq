@@ -167,10 +167,24 @@ prpl_attention_types(PurpleAccount *acct)
 static int
 prpl_im_send(PurpleConnection *pc, const char *who,
     const char *message, PurpleMessageFlags flags) {
+	const char *image_start, *image_end;
 	PurpleConversation *conv;
+	GData *image_attribs;
 
 	conv = purple_find_conversation_with_account(
 	    PURPLE_CONV_TYPE_IM, who, pc->account);
+
+	if (purple_markup_find_tag("img", message,
+	    &image_start, &image_end, &image_attribs)) {
+		        int imgstore_id = atoi(g_datalist_get_data(
+			    &image_attribs, "id"));
+			purple_imgstore_ref_by_id(imgstore_id);
+
+			u2u_img_message_send(pc, conv, imgstore_id);
+
+			g_datalist_clear(&image_attribs);
+			return 0;
+	}
 
 	u2u_message_send(pc, conv, message);
 
@@ -182,8 +196,22 @@ static int
 prpl_chat_send(PurpleConnection *pc, int id,
     const char *message, PurpleMessageFlags flags) {
 	PurpleConversation *conv = purple_find_chat(pc, id);
+	const char *image_start, *image_end;
+	GData *image_attribs;
 	if(!conv) {
 		return -1;
+	}
+
+	if (purple_markup_find_tag("img", message,
+	    &image_start, &image_end, &image_attribs)) {
+		        int imgstore_id = atoi(g_datalist_get_data(
+			    &image_attribs, "id"));
+			purple_imgstore_ref_by_id(imgstore_id);
+
+			u2c_img_message_send(pc, conv, imgstore_id);
+
+			g_datalist_clear(&image_attribs);
+			return 0;
 	}
 
 	u2c_message_send(pc, conv, message);
@@ -259,6 +287,7 @@ prpl_get_info(PurpleConnection *pc, const char *who)
 /* 协议描述 */
 static PurplePluginProtocolInfo prpl_info =
 {
+	OPT_PROTO_UNIQUE_CHATNAME |
 	OPT_PROTO_CHAT_TOPIC |	    /* 具有聊天主题（群/好友 描述/签名） */
 	OPT_PROTO_IM_IMAGE,	    /* 聊天支持图像（图片/表情） */
 	NULL,			    /* 用户名分割, 稍后在 prpl_init() 中初始化 */

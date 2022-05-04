@@ -14,6 +14,7 @@
 #include "event.h"
 #include "eventloop.h"
 #include "glibconfig.h"
+#include "imgstore.h"
 #include "json_object.h"
 #include "notify.h"
 #include "server.h"
@@ -24,6 +25,12 @@ struct message {
 	PurpleConversation *conv;
 	ProtoData *pd;
 	char *text;
+};
+
+struct image_message {
+	PurpleConversation *conv;
+	ProtoData *pd;
+	int image_id;
 };
 
 void
@@ -112,11 +119,42 @@ u2c_message_send(PurpleConnection *pc, PurpleConversation *conv,
 	w->data = d;
 	g_queue_push_tail(pd->queue, w);
 
-	char *s_id = g_malloc0(sizeof(char)*12);
+	char s_id[12];
 	sprintf(s_id, "%d", purple_conv_chat_get_id(PURPLE_CONV_CHAT(conv)));
 	axon_client_gsend_plain(pd->fd, s_id, unescaped_msg);
-	g_free(s_id);
 	g_free(unescaped_msg);
+}
+
+void
+u2c_img_message_send(PurpleConnection *pc, PurpleConversation *conv, int id)
+{
+	struct message *d = g_new0(struct message, 1);
+	PurpleStoredImage *image;
+	char *b64_dptr = NULL;
+	const guchar *raw_dptr;
+
+	PD_FROM_PTR(pc->proto_data);
+	NEW_WATCHER_W();
+
+	image = purple_imgstore_find_by_id(id);
+	if (image == NULL) return;
+	raw_dptr  = purple_imgstore_get_data(image);
+	b64_dptr = purple_base64_encode(raw_dptr,
+	    purple_imgstore_get_size(image));
+
+	d->text = g_strdup_printf("\n<IMG ID=\"%d\">", id);
+	d->conv = conv;
+	d->pd   = pd;
+
+	w->ok   = u2c_message_ok;
+	w->err  = u2c_message_err;
+	w->data = d;
+	g_queue_push_tail(pd->queue, w);
+
+	char s_id[12];
+	sprintf(s_id, "%d", purple_conv_chat_get_id(PURPLE_CONV_CHAT(conv)));
+	axon_client_gsend_image(pd->fd, s_id, b64_dptr);
+	g_free(b64_dptr);
 }
 
 void
@@ -171,6 +209,38 @@ u2u_message_send(PurpleConnection *pc, PurpleConversation *conv,
 	axon_client_fsend_plain(pd->fd,
 	    purple_conversation_get_name(conv), unescaped_msg);
 	g_free(unescaped_msg);
+}
+
+void
+u2u_img_message_send(PurpleConnection* pc, PurpleConversation* conv, int id)
+{
+	struct message *d = g_new0(struct message, 1);
+	PurpleStoredImage *image;
+	char *b64_dptr = NULL;
+	const guchar *raw_dptr;
+
+	PD_FROM_PTR(pc->proto_data);
+	NEW_WATCHER_W();
+
+	image = purple_imgstore_find_by_id(id);
+	if (image == NULL) return;
+	raw_dptr  = purple_imgstore_get_data(image);
+	b64_dptr = purple_base64_encode(raw_dptr,
+	    purple_imgstore_get_size(image));
+
+	d->text = g_strdup_printf("\n<IMG ID=\"%d\">", id);
+	d->conv = conv;
+	d->pd   = pd;
+
+	w->ok   = u2u_message_ok;
+	w->err  = u2u_message_err;
+	w->data = d;
+
+	g_queue_push_tail(pd->queue, w);
+	axon_client_fsend_image(pd->fd,
+	    purple_conversation_get_name(conv),
+	    b64_dptr);
+	g_free(b64_dptr);
 }
 
 void

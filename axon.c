@@ -125,12 +125,34 @@ axon_client_fsend_plain(int sockfd, const char *id, const char *message)
 }
 
 void
+axon_client_fsend_image(int sockfd, const char *id, const char *data)
+{
+	Data j = data_new();
+	data_set_param(j, "data", data);
+	data_set_param(j, "id", id);
+	data_set_cmd(j, "USEND_IMG");
+	data_write_to_fd(j, sockfd);
+	data_free(j);
+}
+
+void
 axon_client_gsend_plain(int sockfd, const char *id, const char *message)
 {
 	Data j = data_new();
 	data_set_param(j, "message", message);
 	data_set_param(j, "id", id);
 	data_set_cmd(j, "GSEND");
+	data_write_to_fd(j, sockfd);
+	data_free(j);
+}
+
+void
+axon_client_gsend_image(int sockfd, const char *id, const char *data)
+{
+	Data j = data_new();
+	data_set_param(j, "data", data);
+	data_set_param(j, "id", id);
+	data_set_cmd(j, "GSEND_IMG");
 	data_write_to_fd(j, sockfd);
 	data_free(j);
 }

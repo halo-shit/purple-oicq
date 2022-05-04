@@ -59,6 +59,15 @@ void axon_client_fsend_shake(int, const char *);
 void axon_client_fsend_plain(int, const char *, const char *);
 
 /**
+ * 向好友发送图片。
+ *
+ * @param sockfd Socket 文件描述符
+ * @param nick 对象用户的替代昵称
+ * @param data 要发送的图片（Base64）
+ */
+void axon_client_fsend_image(int, const char *, const char *);
+
+/**
  * 向群聊发送一条文本消息。
  *
  * @param sockfd Socket 文件描述符
@@ -66,6 +75,15 @@ void axon_client_fsend_plain(int, const char *, const char *);
  * @param message 要发送的文本消息
  */
 void axon_client_gsend_plain(int, const char *, const char *);
+
+/**
+ * 向群聊发送图片。
+ *
+ * @param sockfd Socket 文件描述符
+ * @param id 对象群聊的群号
+ * @param message 要发送的文本消息
+ */
+void axon_client_gsend_image(int, const char *, const char *);
 
 /**
  * 根据昵称查询用户信息。
