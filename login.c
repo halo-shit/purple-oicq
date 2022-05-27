@@ -8,12 +8,16 @@
 #include "event.h"
 #include "json_object.h"
 #include "notify.h"
+#include "request.h"
+#include <stdio.h>
 #include <string.h>
 
 #include <glib.h>
 
+void axon_client_login_err(PurpleConnection *, gpointer, Data);
+
 void
-purple_login_err(PurpleConnection *pc, gpointer message, Data _)
+purple_init_err(PurpleConnection *pc, gpointer message, Data _)
 {
 	purple_connection_error_reason(pc,
 	    PURPLE_CONNECTION_ERROR_OTHER_ERROR,
@@ -87,7 +91,7 @@ axon_client_flist_ok(PurpleConnection *pc, gpointer _, Data data)
 		name = json_object_array_get_idx(list, i);
 		s_name = json_object_get_string(name);
 		/* 若用户已存在，则直接设置在线状态 */
- set_online_status: {}
+ set_online_status:
 		if (purple_find_buddy(pc->account, s_name) != NULL) {
 			purple_prpl_got_user_status(pc->account,
 			    s_name, "online", NULL);
@@ -103,7 +107,7 @@ axon_client_flist_ok(PurpleConnection *pc, gpointer _, Data data)
 
 	NEW_WATCHER_W();
 	w->ok   = axon_client_glist_ok;
-	w->err  = purple_login_err;
+	w->err  = purple_init_err;
 	w->data = "没能同步群聊列表";
 	g_queue_push_tail(pd->queue, w);
 
@@ -128,7 +132,7 @@ axon_client_whoami_ok(PurpleConnection *pc, gpointer _, Data response)
 	NEW_WATCHER_W();
 	w->data = "没能同步好友列表";
 	w->ok   = axon_client_flist_ok;
-	w->err  = purple_login_err;
+	w->err  = purple_init_err;
 	g_queue_push_tail(pd->queue, w);
 
 	axon_client_call(pd->fd, "FLIST");
@@ -152,11 +156,73 @@ axon_client_login_ok(PurpleConnection *pc, gpointer _, Data __)
 	NEW_WATCHER_W();
 	w->data = "没能查询到身份";
 	w->ok   = axon_client_whoami_ok;
-	w->err  = purple_login_err;
+	w->err  = purple_init_err;
 	g_queue_push_tail(pd->queue, w);
 
 	axon_client_call(pd->fd, "WHOAMI");
 }
+
+void
+go_ahead_cb(void *dptr)
+{
+	PurpleConnection *pc = dptr;
+	PD_FROM_PTR(pc->proto_data);
+
+	NEW_WATCHER_W();
+	w->ok   = axon_client_login_ok;
+	w->err  = axon_client_login_err;
+	g_queue_push_tail(pd->queue, w);
+
+	axon_client_call(pd->fd, "GOAHEAD");
+}
+
+void
+ticket_submit_cb()
+{
+
+}
+
+void
+axon_client_login_err(PurpleConnection *pc, gpointer _, Data data)
+{
+	PD_FROM_PTR(pc->proto_data);
+	Data login_t, tmp;
+
+	json_object_object_get_ex(data, "login", &login_t);
+
+	switch (json_object_get_int(login_t)) {
+	case L_ERROR:
+		json_object_object_get_ex(data, "message", &tmp);
+		purple_connection_error_reason(pc,
+		    PURPLE_CONNECTION_ERROR_OTHER_ERROR,
+		    json_object_get_string(tmp));
+		break;
+	case L_SLIDER:
+		json_object_object_get_ex(data, "url", &tmp);
+		sprintf(pd->buf, "本次登录需要滑块登录，验证码：%s。"
+		    "请在滑块完成后输入 ticket。",
+		    json_object_get_string(tmp));
+
+		purple_request_input(pc, "登录验证", pd->buf, NULL, "", FALSE,
+		    FALSE, NULL, "提交", NULL, "取消", NULL,
+		    pd->acct, NULL, NULL, NULL);
+		break;
+	case L_QRCODE:
+		/* 保存图片并显示 */
+		break;
+	case L_DEVICE:
+		json_object_object_get_ex(data, "url", &tmp);
+		purple_notify_message(pc, PURPLE_NOTIFY_MSG_WARNING, "登录验证",
+		    "本次登录需要解锁设备锁，请前往弹出链接解锁，并在完成后关闭此窗口提交。",
+		    NULL, go_ahead_cb, pc);
+		purple_notify_uri(pc, json_object_get_string(tmp));
+		break;
+	}
+}
+
+void
+test_cb()
+{}
 
 void
 axon_client_init_ok(PurpleConnection *pc, gpointer _, Data __)
@@ -167,22 +233,15 @@ axon_client_init_ok(PurpleConnection *pc, gpointer _, Data __)
 	purple_connection_update_progress(pc, "登录到 QQ", 2, 5);
 
 	NEW_WATCHER_W();
-	w->data = "没能登录到 QQ 服务";
 	w->ok   = axon_client_login_ok;
-	w->err  = purple_login_err;
+	w->err  = axon_client_login_err;
 	g_queue_push_tail(pd->queue, w);
 
 	/* 登录方式检查 */
 	if (STR_IS_EQUAL(purple_account_get_string(pc->account,
 	    PRPL_ACCT_OPT_LOGIN, PRPL_ACCT_OPT_USE_PASSWORD),
-	    PRPL_ACCT_OPT_USE_PASSWORD))
+	    PRPL_ACCT_OPT_USE_PASSWORD)) {
 		axon_client_password_login(pd->fd, pc->account->password);
-	else if (STR_IS_EQUAL(purple_account_get_string(pc->account,
-	    PRPL_ACCT_OPT_LOGIN, PRPL_ACCT_OPT_USE_PASSWORD),
-	    PRPL_ACCT_OPT_USE_QRCODE_ONCE)) {
-		purple_notify_info(pc, "提示", "请到 AXON 所在的控制台查看对应的二维码，"
-		    "并在扫描后敲击 Enter 键继续。", NULL);
-		axon_client_qrcode_login(pd->fd);
 	} else {
 		axon_client_qrcode_login(pd->fd);
 	}

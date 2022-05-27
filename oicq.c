@@ -138,7 +138,7 @@ prpl_login(PurpleAccount *acct)
 	NEW_WATCHER_W();
 	w->data = "没能初始化 OICQ 客户端";
 	w->ok   = axon_client_init_ok;
-	w->err  = purple_login_err;
+	w->err  = purple_init_err;
 	g_queue_push_tail(pd->queue, w);
 
 	pc->inpa = purple_input_add(pd->fd, PURPLE_INPUT_READ, event_cb, pd);
@@ -176,14 +176,14 @@ prpl_im_send(PurpleConnection *pc, const char *who,
 
 	if (purple_markup_find_tag("img", message,
 	    &image_start, &image_end, &image_attribs)) {
-		        int imgstore_id = atoi(g_datalist_get_data(
-			    &image_attribs, "id"));
-			purple_imgstore_ref_by_id(imgstore_id);
+		int imgstore_id = atoi(g_datalist_get_data(
+		    &image_attribs, "id"));
+		purple_imgstore_ref_by_id(imgstore_id);
 
-			u2u_img_message_send(pc, conv, imgstore_id);
+		u2u_img_message_send(pc, conv, imgstore_id);
 
-			g_datalist_clear(&image_attribs);
-			return 0;
+		g_datalist_clear(&image_attribs);
+		return 0;
 	}
 
 	u2u_message_send(pc, conv, message);
@@ -204,14 +204,14 @@ prpl_chat_send(PurpleConnection *pc, int id,
 
 	if (purple_markup_find_tag("img", message,
 	    &image_start, &image_end, &image_attribs)) {
-		        int imgstore_id = atoi(g_datalist_get_data(
-			    &image_attribs, "id"));
-			purple_imgstore_ref_by_id(imgstore_id);
+		int imgstore_id = atoi(g_datalist_get_data(
+		    &image_attribs, "id"));
+		purple_imgstore_ref_by_id(imgstore_id);
 
-			u2c_img_message_send(pc, conv, imgstore_id);
+		u2c_img_message_send(pc, conv, imgstore_id);
 
-			g_datalist_clear(&image_attribs);
-			return 0;
+		g_datalist_clear(&image_attribs);
+		return 0;
 	}
 
 	u2c_message_send(pc, conv, message);
@@ -319,7 +319,6 @@ static PurplePluginProtocolInfo prpl_info =
 	NULL,				   /* 设置Idle */
 	NULL,				   /* 修改密码 */
 	NULL,
-	// prpl_add_buddy,			   /* 加好友 */
 	NULL,				   /* 加好友 */
 	NULL,				   /* 删好友 */
 	NULL,				   /* 删好友 */
@@ -333,10 +332,6 @@ static PurplePluginProtocolInfo prpl_info =
 	NULL,
 	NULL,
 	NULL,
-	// prpl_reject_chat,		   /* 拒绝聊天 */
-	// prpl_get_chat_name,		   /* 获取聊天名称 */
-	// prpl_chat_invite,		   /* 聊天邀请 */
-	// prpl_chat_leave,		   /* 退出聊天 */
 	NULL,				   /* ？？？ */
 	prpl_chat_send,			   /* 发送聊天 */
 	NULL,				   /* keepalive */

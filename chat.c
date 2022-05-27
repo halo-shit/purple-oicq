@@ -107,7 +107,7 @@ u2c_message_send(PurpleConnection *pc, PurpleConversation *conv,
 	char *unescaped_msg, *original_msg;
 
 	/* 原始的消息会被释放，所以得到一份拷贝。 */
-	CLONE_STR(unescaped_msg, purple_unescape_text(message));
+	CLONE_STR(unescaped_msg, purple_unescape_html(message));
 	CLONE_STR(original_msg, message);
 
 	d->conv = conv;
@@ -194,7 +194,7 @@ u2u_message_send(PurpleConnection *pc, PurpleConversation *conv,
 	char *unescaped_msg, *original_msg;
 
 	/* 原始的消息会被释放，所以得到一份拷贝。 */
-	CLONE_STR(unescaped_msg, purple_unescape_text(message));
+	CLONE_STR(unescaped_msg, purple_unescape_html(message));
 	CLONE_STR(original_msg, message);
 
 	d->conv = conv;

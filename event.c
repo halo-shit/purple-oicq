@@ -47,7 +47,29 @@ chat_new_arrival_cb(PurpleConnection *pc, Data event)
 }
 
 void
-chat_cb_leave_cb(PurpleConnection *pc, Data event)
+chat_recall_cb(PurpleConnection *pc, Data event)
+{
+	PurpleConversation *conv;
+	char notification[32];
+	Data id, name;
+
+	json_object_object_get_ex(event, "id", &id);
+	json_object_object_get_ex(event, "name", &name);
+
+	conv = purple_find_chat(pc, json_object_get_int(id));
+	if (conv == NULL)
+		return;
+
+	snprintf(notification, 31, "%s 撤回了一条消息。",
+	    json_object_get_string(name));
+
+	purple_conv_chat_write(PURPLE_CONV_CHAT(conv),
+	    json_object_get_string(name), notification,
+	    PURPLE_MESSAGE_SYSTEM, g_get_real_time()/1000/1000);
+}
+
+void
+chat_leave_cb(PurpleConnection *pc, Data event)
 {
 	PurpleConversation *conv;
 	Data id, name, reason;
@@ -341,7 +363,10 @@ event_cb(gpointer data, gint _, PurpleInputCondition __)
 			chat_new_arrival_cb(pd->acct->gc, top);
 			break;
 		case(E_GROUP_DECREASE):
-			chat_cb_leave_cb(pd->acct->gc, top);
+			chat_leave_cb(pd->acct->gc, top);
+			break;
+		case(E_GROUP_RECALL):
+			chat_recall_cb(pd->acct->gc, top);
 			break;
 		default:
 			DEBUG_LOG("unexpected event type");

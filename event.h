@@ -30,18 +30,23 @@ void event_cb(gpointer, gint, PurpleInputCondition);
 
 Watcher *watcher_nil();
 
-#define RET_STATUS_OK 0
-#define RET_STATUS_EVENT 1
+enum {
+	RET_STATUS_OK = 0,
+	RET_STATUS_EVENT = 1,
+};
 
 /* 事件类型 */
-#define E_FRIEND_MESSAGE     1
-#define E_GROUP_MESSAGE      2
-#define E_FRIEND_ATTENTION   3
-#define E_GROUP_INVITE       4
-#define E_GROUP_INCREASE     5
-#define E_GROUP_DECREASE     6
-#define E_GROUP_IMG_MESSAGE  7
-#define E_FRIEND_IMG_MESSAGE 8
+enum {
+	E_FRIEND_MESSAGE     = 1,
+	E_GROUP_MESSAGE      = 2,
+	E_FRIEND_ATTENTION   = 3,
+	E_GROUP_INVITE       = 4,
+	E_GROUP_INCREASE     = 5,
+	E_GROUP_DECREASE     = 6,
+	E_GROUP_IMG_MESSAGE  = 7,
+	E_FRIEND_IMG_MESSAGE = 8,
+	E_GROUP_RECALL	     = 9,
+};
 
 #define MEDIA_MAX_LEN 1024*1024*10
 
