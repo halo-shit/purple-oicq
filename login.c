@@ -9,6 +9,7 @@
 #include "json_object.h"
 #include "notify.h"
 #include "request.h"
+#include "util.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -177,16 +178,12 @@ go_ahead_cb(void *dptr)
 }
 
 void
-ticket_submit_cb()
-{
-
-}
-
-void
 axon_client_login_err(PurpleConnection *pc, gpointer _, Data data)
 {
-	PD_FROM_PTR(pc->proto_data);
+	guchar *dptr = NULL;
 	Data login_t, tmp;
+	FILE *qrcode;
+	gsize dlen = 0;
 
 	json_object_object_get_ex(data, "login", &login_t);
 
@@ -198,17 +195,39 @@ axon_client_login_err(PurpleConnection *pc, gpointer _, Data data)
 		    json_object_get_string(tmp));
 		break;
 	case L_SLIDER:
+		/*
 		json_object_object_get_ex(data, "url", &tmp);
 		sprintf(pd->buf, "本次登录需要滑块登录，验证码：%s。"
 		    "请在滑块完成后输入 ticket。",
 		    json_object_get_string(tmp));
-
 		purple_request_input(pc, "登录验证", pd->buf, NULL, "", FALSE,
 		    FALSE, NULL, "提交", NULL, "取消", NULL,
 		    pd->acct, NULL, NULL, NULL);
+		*/
+		purple_connection_error_reason(pc,
+		    PURPLE_CONNECTION_ERROR_AUTHENTICATION_IMPOSSIBLE,
+		    "本次登录需要滑块登录，请先进行一次扫码登录以跳过。");
 		break;
 	case L_QRCODE:
-		/* 保存图片并显示 */
+		json_object_object_get_ex(data, "data", &tmp);
+		purple_notify_message(pc, PURPLE_NOTIFY_MSG_WARNING, "登录验证",
+		    "本次登录需要扫描二维码，请前往弹出图片扫描，并在扫描后关闭本窗口。\n",
+		    "如果图片没有弹出，请访问 /tmp/oicq-qrcode-verify.png。\n"
+		    "如果二维码失效，请关闭窗口以再次获取。", go_ahead_cb, pc);
+
+		dptr = purple_base64_decode(json_object_get_string(tmp), &dlen);
+
+		qrcode = fopen("/tmp/oicq-qrcode-verify.png", "w");
+		if (qrcode == NULL) {
+			DEBUG_LOG("failed to open file");
+			return;
+		}
+
+		fwrite(dptr, 1, dlen, qrcode);
+		fflush(qrcode);
+		fclose(qrcode);
+
+		system("xdg-open /tmp/oicq-qrcode-verify.png &");
 		break;
 	case L_DEVICE:
 		json_object_object_get_ex(data, "url", &tmp);
@@ -219,10 +238,6 @@ axon_client_login_err(PurpleConnection *pc, gpointer _, Data data)
 		break;
 	}
 }
-
-void
-test_cb()
-{}
 
 void
 axon_client_init_ok(PurpleConnection *pc, gpointer _, Data __)
