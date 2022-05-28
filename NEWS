@@ -16,7 +16,7 @@
 			Copyright (C) axon-oicq team 2022
 	在保留此声明的情况下，允许对此文章进行逐字复制并发布到任何地方。
 =======================================================================
-                        purple-oicq 1.0.0 Caveats
+                        purple-oicq 1.0.1 Caveats
 
 	* 批量转发的消息无法显示。
 
@@ -25,6 +25,8 @@
 	* Pidgin 中发送的消息中可能留下 <FONT>。
 
 	* 系统休眠后，Pidgin 可能崩溃。
+
+	* 推群消息可能显示为加入聊天。
 
 	    更多有关使用 purple-oicq 的问题，可以在 Github Issues 内提交。
 	也可以通过邮件联系我 axon-oicq@riseup.net。我们十分欢迎您提出的：
