@@ -5,6 +5,11 @@
 
 #include "common.h"
 
+typedef struct {
+	PurpleConnection *pc;
+	char *name;
+} BUDDY_INFO;
+
 enum {
 	L_DEVICE = 0,
 	L_ERROR	 = 1,

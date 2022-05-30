@@ -2,6 +2,7 @@
 #include "account.h"
 #include "axon.h"
 #include "blist.h"
+#include "buddyicon.h"
 #include "common.h"
 #include "connection.h"
 #include "conversation.h"
@@ -10,12 +11,47 @@
 #include "notify.h"
 #include "request.h"
 #include "util.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
 #include <glib.h>
 
 void axon_client_login_err(PurpleConnection *, gpointer, Data);
+
+void
+buddy_icon_download_cb(PurpleUtilFetchUrlData *_, gpointer dptr,
+    const gchar *buffer, gsize len, const gchar *error_message)
+{
+	BUDDY_INFO *binfo = dptr;
+	char *data = g_malloc0(len + 1);
+
+	if (len == 0) {
+		DEBUG_LOG("failed to retrieve buddy icons");
+		DEBUG_LOG(error_message);
+		return;
+	}
+
+	memcpy(data, buffer, len);
+	purple_buddy_icon_new(binfo->pc->account, binfo->name, data, len, NULL);
+
+	g_free(binfo->name);
+	g_free(binfo);
+}
+
+void
+purple_update_buddy_icon(PurpleConnection *pc, int64_t id, char *name)
+{
+	char url[64];
+	BUDDY_INFO *binfo = g_malloc0(sizeof (BUDDY_INFO));
+
+	snprintf(url, 63, "http://q1.qlogo.cn/g?b=qq&nk=%zu&s=640", id);
+
+	binfo->pc = pc;
+	binfo->name = name;
+	purple_util_fetch_url_len(url, TRUE, NULL, TRUE, MEDIA_MAX_LEN,
+	    buddy_icon_download_cb, binfo);
+}
 
 void
 purple_init_err(PurpleConnection *pc, gpointer message, Data _)
@@ -77,9 +113,10 @@ axon_client_flist_ok(PurpleConnection *pc, gpointer _, Data data)
 	PD_FROM_PTR(pc->proto_data);
 	int friend_count; const char *s_name;
 	PurpleGroup *group; PurpleBuddy *buddy;
-	Data name, list;
+	Data name, list, idlist;
 
 	json_object_object_get_ex(data, "list", &list);
+	json_object_object_get_ex(data, "idlist", &idlist);
 	friend_count = json_object_array_length(list);
 	/* 如果对应分组不存在就新建一个 */
 	group = purple_find_group(PRPL_SYNC_GROUP_BUDDY);
@@ -101,8 +138,15 @@ axon_client_flist_ok(PurpleConnection *pc, gpointer _, Data data)
 		/* 不显示 BabyQ */
 		if (!strcmp(s_name, "babyQ"))
 			continue;
+		/* 添加好友 */
 		buddy = purple_buddy_new(pc->account, s_name, s_name);
 		purple_blist_add_buddy(buddy, NULL, group, NULL);
+		/* 处理好友头像 */
+		char *altname = NULL;
+		CLONE_STR(altname, s_name);
+		name = json_object_array_get_idx(idlist, i);
+		purple_update_buddy_icon(pc, json_object_get_int64(name),
+		    altname);
 		goto set_online_status;
 	}
 
