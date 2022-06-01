@@ -5,22 +5,21 @@
 #include <purple.h>
 #include <json-c/json.h>
 
-typedef struct {
-	PurpleAccount *acct;
-	int fd;
-
-	char *whoami;
-	char *buf;
-
-	GQueue *queue;
+typedef struct
+{
+  PurpleAccount *acct;
+  gint		 fd;
+  gchar		*whoami;
+  gchar		*buf;
+  GQueue	*queue;
 } ProtoData;
 
 /* 指代 JSON 数据 */
-typedef struct json_object* Data;
+typedef struct json_object *Data;
 
-void data_free(Data);
+void data_free (Data);
 
-void data_set_param(Data, const char *, const char *);
+void data_set_param (Data, const char *, const char *);
 
 /* “关于” 信息 */
 #define DISPLAY_VERSION "1.0.0"
@@ -48,10 +47,6 @@ void data_set_param(Data, const char *, const char *);
     __FUNCTION__, __LINE__, ## x)
 #define PD_FROM_PTR(ptr) ProtoData *pd = ptr
 #define NEW_WATCHER_W() Watcher *w = g_new(Watcher, 1)
-#define CLONE_STR(dest, src) dest = g_malloc0(sizeof(char)*strlen(src)+1); \
-strcpy(dest, src)
-
-#define STR_IS_EQUAL(a, b) strcmp(a, b) == 0
 
 /* 考虑到两千人群，缓冲区需要这么大 */
 #define BUFSIZE 10*8192*sizeof(char)

@@ -4,7 +4,7 @@
 #include <glib.h>
 #include <purple.h>
 
-typedef struct json_object * Data;
+typedef struct json_object *Data;
 
 /* “关于” 信息 */
 #define DISPLAY_VERSION "0.0.2"
