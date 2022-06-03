@@ -1,10 +1,12 @@
 #include <glib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <json-c/json.h>
 #include <purple.h>
+#include <math.h>
 
 #include "axon.h"
 #include "blist.h"
@@ -64,7 +66,7 @@ chat_recall_cb (PurpleConnection *pc, Data event)
 	    json_object_get_string (name));
 
   purple_conv_chat_write (PURPLE_CONV_CHAT (conv),
-			  json_object_get_string (name), notification,
+			  "Axon", notification,
 			  PURPLE_MESSAGE_SYSTEM,
 			  g_get_real_time () / 1000 / 1000);
 }
@@ -313,22 +315,42 @@ event_cb (gpointer data, gint _, PurpleInputCondition __)
   PD_FROM_PTR (data);
   Data top, type, status;
   Watcher *w = NULL;
-  gsize bytes_read;
 
   DEBUG_LOG ("getting an event");
 
-  bytes_read = read (pd->fd, pd->buf, BUFSIZE);
-  if (bytes_read == 0)
+  /* 按数字前缀的长度读取 Json 数据流 */
+  gsize bytes_read = 0;
+  
+  while (TRUE)
     {
-      DEBUG_LOG ("network failure");
-      purple_connection_error_reason (pd->acct->gc, PURPLE_CONNECTION_ERROR_OTHER_ERROR,
-				      "丢失了到 AXON 的连接");
-      purple_input_remove (pd->acct->gc->inpa);
-      return;
-    }
+      if (bytes_read + 1024 > pd->buf_size)
+	{
+	  pd->buf = g_realloc (pd->buf, pd->buf_size + 1024);
+	  pd->buf_size += 1024;
+	  continue;
+	}
 
-  pd->buf[bytes_read] = '\0';
-  // DEBUG_LOG(pd->buf);
+      bytes_read += read (pd->fd, pd->buf + bytes_read, 1024);
+      if (bytes_read == 0)
+	    {
+	      DEBUG_LOG ("network failure");
+	      purple_connection_error_reason (pd->acct->gc, PURPLE_CONNECTION_ERROR_OTHER_ERROR,
+					      "丢失了到 AXON 的连接");
+	      purple_input_remove (pd->acct->gc->inpa);
+	      return;
+	    }
+      
+      
+      if (pd->buf[bytes_read - 1] == '\n')
+	{
+	  pd->buf[bytes_read - 1] = 0;
+	  break;
+	}
+    }
+    
+
+  
+  DEBUG_LOG(pd->buf);
 
   top = json_tokener_parse (pd->buf);
   json_object_object_get_ex (top, "status", &status);

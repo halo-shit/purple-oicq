@@ -55,17 +55,17 @@ prpl_chat_info (PurpleConnection *pc)
   GList				*params = NULL;
   struct proto_chat_entry	*pce;
 
-  pce = g_new0 (struct proto_chat_entry, 1);
-  pce->label = "群名:";	/* 需要本地化 */
+  pce		  = g_new0 (struct proto_chat_entry, 1);
+  pce->label	  = "群名:";	/* 需要本地化 */
   pce->identifier = PRPL_CHAT_INFONAME;
-  pce->required = FALSE;
-  params = g_list_append (params, pce);
+  pce->required	  = FALSE;
+  params	  = g_list_append (params, pce);
 
-  pce = g_new0 (struct proto_chat_entry, 1);
-  pce->label = "群号:";	/* 需要本地化 */
+  pce		  = g_new0 (struct proto_chat_entry, 1);
+  pce->label	  = "群号:";	/* 需要本地化 */
   pce->identifier = PRPL_CHAT_INFOID;
-  pce->required = TRUE;
-  params = g_list_append (params, pce);
+  pce->required	  = TRUE;
+  params	  = g_list_append (params, pce);
 
   return params;
 }
@@ -121,10 +121,11 @@ prpl_login (PurpleAccount *acct)
     }
 
   DEBUG_LOG ("loading protocol data");
-  pd->acct = acct;
-  pd->fd = sock_conn;
-  pd->buf = g_malloc0 (BUFSIZE);
-  pd->queue = g_queue_new ();
+  pd->acct     = acct;
+  pd->fd       = sock_conn;
+  pd->buf      = g_malloc0 (DEFAULT_BUFSIZE);
+  pd->buf_size = DEFAULT_BUFSIZE;
+  pd->queue    = g_queue_new ();
   purple_connection_set_protocol_data (pc, pd);
 
   DEBUG_LOG ("waiting for next procedure");
@@ -132,8 +133,8 @@ prpl_login (PurpleAccount *acct)
 
   NEW_WATCHER_W ();
   w->data = "没能初始化 OICQ 客户端";
-  w->ok = axon_client_init_ok;
-  w->err = purple_init_err;
+  w->ok	  = axon_client_init_ok;
+  w->err  = purple_init_err;
   g_queue_push_tail (pd->queue, w);
 
   pc->inpa = purple_input_add (pd->fd, PURPLE_INPUT_READ, event_cb, pd);
@@ -269,8 +270,8 @@ prpl_get_info (PurpleConnection *pc, const gchar *who)
   NEW_WATCHER_W ();
 
   w->data = (gpointer) who;
-  w->ok = lookup_ok;
-  w->err = lookup_err;
+  w->ok	  = lookup_ok;
+  w->err  = lookup_err;
   g_queue_push_tail (pd->queue, w);
   axon_client_lookup_nickname (pd->fd, who);
 }

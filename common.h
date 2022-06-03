@@ -11,6 +11,7 @@ typedef struct
   gint		 fd;
   gchar		*whoami;
   gchar		*buf;
+  gsize		 buf_size;
   GQueue	*queue;
 } ProtoData;
 
@@ -49,6 +50,6 @@ void data_set_param (Data, const char *, const char *);
 #define NEW_WATCHER_W() Watcher *w = g_new(Watcher, 1)
 
 /* 考虑到两千人群，缓冲区需要这么大 */
-#define BUFSIZE 10*8192*sizeof(char)
+#define DEFAULT_BUFSIZE 8192
 
 #endif

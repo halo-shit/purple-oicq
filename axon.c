@@ -46,7 +46,8 @@ data_write_to_fd (Data data, int fd)
     return -1;
   const char *plain;
   plain = json_object_to_json_string (data);
-  return write (fd, plain, strlen (plain));
+  write (fd, plain, strlen (plain));
+  return write (fd, "\n", 1);
 }
 
 int
