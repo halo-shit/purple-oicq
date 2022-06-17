@@ -186,6 +186,7 @@ c2u_event_cb (PurpleConnection *pc, JsonReader *event)
       gchar *s_name = g_strdup (name);
       conv = serv_got_joined_chat (pc, id, s_name);
       update_chat_members (pc, conv);
+      update_chat_topic (pc, conv);
     }
 
   serv_got_chat_in (pc, id, sender, PURPLE_MESSAGE_RECV, text, time);

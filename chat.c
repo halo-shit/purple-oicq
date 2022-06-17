@@ -7,6 +7,7 @@
 
 #include "axon.h"
 #include "common.h"
+#include "conversation.h"
 #include "event.h"
 #include "eventloop.h"
 #include "chat.h"
@@ -202,7 +203,7 @@ u2u_message_send (PurpleConnection *pc, PurpleConversation *conv,
 }
 
 void
-u2u_img_message_send (PurpleConnection * pc, PurpleConversation * conv,
+u2u_img_message_send (PurpleConnection *pc, PurpleConversation * conv,
 		      int id)
 {
   struct message	*d	  = g_new0 (struct message, 1);
@@ -234,7 +235,7 @@ u2u_img_message_send (PurpleConnection * pc, PurpleConversation * conv,
 }
 
 void
-fetch_chat_members_ok (PurpleConnection * pc, gpointer c, JsonReader *data)
+fetch_chat_members_ok (PurpleConnection *pc, gpointer c, JsonReader *data)
 {
   PurpleConversation	*conv  = c;
   const gchar 	        *owner, *normal, *admin;
@@ -291,7 +292,7 @@ fetch_chat_members_ok (PurpleConnection * pc, gpointer c, JsonReader *data)
 }
 
 void
-fetch_chat_members_err (PurpleConnection * pc, gpointer conv, JsonReader *_)
+fetch_chat_members_err (PurpleConnection *pc, gpointer conv, JsonReader *_)
 {
   purple_conv_chat_write (PURPLE_CONV_CHAT (conv),
 			  "Axon",
@@ -302,12 +303,12 @@ fetch_chat_members_err (PurpleConnection * pc, gpointer conv, JsonReader *_)
 }
 
 void
-update_chat_members (PurpleConnection * pc, PurpleConversation * conv)
+update_chat_members (PurpleConnection *pc, PurpleConversation * conv)
 {
   DEBUG_LOG ("updating group member list");
   PD_FROM_PTR (pc->proto_data);
 
-  int chat_id = 0;
+  gint chat_id = 0;
   chat_id = purple_conv_chat_get_id (PURPLE_CONV_CHAT (conv));
 
   NEW_WATCHER_W ();
@@ -316,8 +317,48 @@ update_chat_members (PurpleConnection * pc, PurpleConversation * conv)
   w->data = conv;
   g_queue_push_tail (pd->queue, w);
 
-  char *s_id = g_malloc0 (sizeof (char) * 12);
+  gchar *s_id = g_malloc0 (sizeof (char) * 12);
   sprintf (s_id, "%d", chat_id);
   axon_client_fetch_group_members (pd->fd, s_id);
+  g_free (s_id);
+}
+
+void
+fetch_chat_topic_ok (PurpleConnection *pc, gpointer c, JsonReader *data)
+{
+  const gchar	*topic;
+
+  json_reader_read_string (data, "topic", topic);
+  purple_conv_chat_set_topic (PURPLE_CONV_CHAT (c), "Axon", topic);
+}
+
+void
+fetch_chat_topic_err (PurpleConnection *pc, gpointer conv, JsonReader *_)
+{
+  purple_conv_chat_write (PURPLE_CONV_CHAT (conv),
+			  "Axon",
+			  "同步群聊话题失败，请检查 AXON 服务器！",
+			  PURPLE_MESSAGE_ERROR,
+			  g_get_real_time () / 1000 / 1000);
+}
+
+void
+update_chat_topic (PurpleConnection *pc, PurpleConversation * conv)
+{
+  DEBUG_LOG ("updating group topic");
+  PD_FROM_PTR (pc->proto_data);
+
+  gint chat_id = 0;
+  chat_id = purple_conv_chat_get_id (PURPLE_CONV_CHAT (conv));
+
+  NEW_WATCHER_W ();
+  w->err  = fetch_chat_topic_err;
+  w->ok	  = fetch_chat_topic_ok;
+  w->data = conv;
+  g_queue_push_tail (pd->queue, w);
+
+  gchar *s_id = g_malloc0 (sizeof (char) * 12);
+  sprintf (s_id, "%d", chat_id);
+  axon_client_fetch_group_info (pd->fd, s_id);
   g_free (s_id);
 }

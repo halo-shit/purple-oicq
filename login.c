@@ -132,7 +132,6 @@ axon_client_flist_ok (PurpleConnection * pc, gpointer _, JsonReader *data)
       json_reader_read_member (data, "list");
       json_reader_read_element_string (data, i, name);
       json_reader_end_member (data);
-      DEBUG_LOG (name);
       /* 若用户已存在，则直接设置在线状态 */
     set_online_status:
       if (purple_find_buddy (pc->account, name) != NULL)

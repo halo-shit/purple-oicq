@@ -11,6 +11,8 @@ void u2u_img_message_send (PurpleConnection *, PurpleConversation *, gint);
 
 void update_chat_members (PurpleConnection *, PurpleConversation *);
 
+void update_chat_topic (PurpleConnection *, PurpleConversation *);
+
 void u2c_message_send (PurpleConnection *, PurpleConversation *, const gchar *);
 
 void u2c_img_message_send (PurpleConnection *, PurpleConversation *, gint);

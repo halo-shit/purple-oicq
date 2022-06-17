@@ -238,6 +238,7 @@ prpl_join_chat (PurpleConnection *pc, GHashTable *components)
     {
       conv = serv_got_joined_chat (pc, atoi (s_id), s_name);
       update_chat_members (pc, conv);
+      update_chat_topic (pc, conv);
     }
 
   // PURPLE_CONV_CHAT(conv)->left = FALSE;
