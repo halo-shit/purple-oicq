@@ -1,13 +1,14 @@
 #ifndef EVENT_H
 #define EVENT_H
 
+#include <json-glib/json-glib.h>
 #include <purple.h>
 
 #include "common.h"
 #include "connection.h"
 #include "conversation.h"
 
-typedef void (*CallbackFunction) (PurpleConnection *, gpointer, Data);
+typedef void (*CallbackFunction) (PurpleConnection *, gpointer, JsonReader*);
 
 typedef struct
 {

@@ -3,23 +3,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <json-c/json.h>
 #include <purple.h>
 
 #include "axon.h"
-#include "blist.h"
 #include "common.h"
-#include "conversation.h"
-#include "debug.h"
 #include "event.h"
 #include "eventloop.h"
-#include "glibconfig.h"
-#include "imgstore.h"
-#include "json_object.h"
-#include "notify.h"
-#include "server.h"
 #include "chat.h"
-#include "util.h"
 
 struct message
 {
@@ -36,43 +26,38 @@ struct image_message
 };
 
 void
-lookup_ok (PurpleConnection *pc, gpointer who, Data data)
+lookup_ok (PurpleConnection *pc, gpointer who, JsonReader *data)
 {
   PurpleNotifyUserInfo	*user_info = purple_notify_user_info_new ();
-  Data			 field;
+  const gchar 		*field;
 
-  json_object_object_get_ex (data, "relation", &field);
-  purple_notify_user_info_prepend_pair (user_info, "加入的群聊",
-					json_object_get_string (field));
+  json_reader_read_string (data, "relation", field);
+  purple_notify_user_info_prepend_pair (user_info, "加入的群聊", field);
 
-  json_object_object_get_ex (data, "sex", &field);
-  purple_notify_user_info_prepend_pair (user_info, "性别",
-					json_object_get_string (field));
+  json_reader_read_string (data, "sex", field);
+  purple_notify_user_info_prepend_pair (user_info, "性别", field);
 
-  json_object_object_get_ex (data, "card", &field);
-  purple_notify_user_info_prepend_pair (user_info, "群名片(昵称)",
-					json_object_get_string (field));
+  json_reader_read_string (data, "card", field);
+  purple_notify_user_info_prepend_pair (user_info, "群名片(昵称)", field);
 
-  json_object_object_get_ex (data, "id", &field);
-  purple_notify_user_info_prepend_pair (user_info, "帐号",
-					json_object_get_string (field));
+  json_reader_read_string (data, "id", field);
+  purple_notify_user_info_prepend_pair (user_info, "帐号", field);
 
-  json_object_object_get_ex (data, "nickname", &field);
-  purple_notify_user_info_prepend_pair (user_info, "昵称",
-					json_object_get_string (field));
+  json_reader_read_string (data, "nickname", field);
+  purple_notify_user_info_prepend_pair (user_info, "昵称", field);
 
   purple_notify_userinfo (pc, who, user_info, NULL, NULL);
   g_free (user_info);
 }
 
 void
-lookup_err (PurpleConnection *pc, gpointer _, Data __)
+lookup_err (PurpleConnection *pc, gpointer _, JsonReader *__)
 {
   purple_notify_error (pc, "错误", "用户信息查询失败！请检查程序日志。", NULL);
 }
 
 void
-u2c_message_ok (PurpleConnection *pc, gpointer data, Data _)
+u2c_message_ok (PurpleConnection *pc, gpointer data, JsonReader *_)
 {
   struct message *d = data;
 
@@ -88,7 +73,7 @@ u2c_message_ok (PurpleConnection *pc, gpointer data, Data _)
 }
 
 void
-u2c_message_err (PurpleConnection *pc, gpointer data, Data _)
+u2c_message_err (PurpleConnection *pc, gpointer data, JsonReader *_)
 {
   struct message *d = data;
 
@@ -163,7 +148,7 @@ u2c_img_message_send (PurpleConnection *pc, PurpleConversation *conv,
 }
 
 void
-u2u_message_ok (PurpleConnection *pc, gpointer data, Data _)
+u2u_message_ok (PurpleConnection *pc, gpointer data, JsonReader *_)
 {
   struct message *d = data;
 
@@ -178,7 +163,7 @@ u2u_message_ok (PurpleConnection *pc, gpointer data, Data _)
 }
 
 void
-u2u_message_err (PurpleConnection *pc, gpointer data, Data _)
+u2u_message_err (PurpleConnection *pc, gpointer data, JsonReader *_)
 {
   struct message *d = data;
 
@@ -200,7 +185,7 @@ u2u_message_send (PurpleConnection *pc, PurpleConversation *conv,
   gchar *unescaped_msg, *original_msg;
 
   /* 原始的消息会被释放，所以得到一份拷贝。 */
-  unescaped_msg = g_strdup (purple_unescape_html (message));
+  unescaped_msg = purple_unescape_html (message);
   original_msg	= g_strdup (message);
 
   d->conv = conv;
@@ -214,7 +199,6 @@ u2u_message_send (PurpleConnection *pc, PurpleConversation *conv,
 
   g_queue_push_tail (pd->queue, w);
   axon_client_fsend_plain (pd->fd, purple_conversation_get_name (conv), unescaped_msg);
-  g_free (unescaped_msg);
 }
 
 void
@@ -250,39 +234,49 @@ u2u_img_message_send (PurpleConnection * pc, PurpleConversation * conv,
 }
 
 void
-fetch_chat_members_ok (PurpleConnection * pc, gpointer c, Data data)
+fetch_chat_members_ok (PurpleConnection * pc, gpointer c, JsonReader *data)
 {
   PurpleConversation	*conv  = c;
-  Data			 members, admins, owner, tmp0, tmp1;
+  const gchar 	        *owner, *normal, *admin;
   GList			*names = NULL, *flags = NULL;
   gint			 member_count, admin_count;
 
-  json_object_object_get_ex (data, "list", &members);
-  json_object_object_get_ex (data, "admin", &admins);
-  json_object_object_get_ex (data, "owner", &owner);
+  json_reader_read_member (data, "admin");
+  admin_count  = json_reader_count_elements (data);
+  json_reader_end_member (data);
+
+  json_reader_read_member (data, "list");
+  member_count = json_reader_count_elements (data);
+  json_reader_end_member (data);
   
-  member_count = json_object_array_length (members);
-  admin_count  = json_object_array_length (admins);
+  json_reader_read_string (data, "owner", owner);
 
   gchar *s_name;
-
   for (gint i = 0; i < member_count; i++)
     {
-      tmp0   = json_object_array_get_idx (members, i);
-      s_name = g_strdup(json_object_get_string (tmp0));
+      json_reader_read_member (data, "list");
+      json_reader_read_element_string (data, i, normal);
+      json_reader_end_member (data);
+      
+      s_name = g_strdup(normal);
       names  = g_list_prepend (names, s_name);
+      
       /* 检查是否为管理员 */
+      json_reader_read_member (data, "admin");
       for (gint ii = 0; ii < admin_count; ii++)
 	{
-	  tmp1 = json_object_array_get_idx (admins, ii);
-	  if (purple_strequal (s_name, json_object_get_string (tmp1)))
+	  json_reader_read_element_string (data, ii, admin);
+	  if (purple_strequal (s_name, admin))
 	    {
 	      flags = g_list_prepend (flags, GINT_TO_POINTER (PURPLE_CBFLAGS_OP));
+	      json_reader_end_member (data);
 	      goto flagsOk;
 	    }
 	}
+      json_reader_end_member (data);
+      
       /* 检查是否为群主 */
-      if (purple_strequal (s_name, json_object_get_string (owner)))
+      if (purple_strequal (s_name, owner))
 	{
 	  flags = g_list_prepend (flags, GINT_TO_POINTER (PURPLE_CBFLAGS_FOUNDER));
 	  goto flagsOk;
@@ -297,7 +291,7 @@ fetch_chat_members_ok (PurpleConnection * pc, gpointer c, Data data)
 }
 
 void
-fetch_chat_members_err (PurpleConnection * pc, gpointer conv, Data _)
+fetch_chat_members_err (PurpleConnection * pc, gpointer conv, JsonReader *_)
 {
   purple_conv_chat_write (PURPLE_CONV_CHAT (conv),
 			  "Axon",

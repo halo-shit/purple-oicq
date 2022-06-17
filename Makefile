@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 
 CC=gcc
-LIBS=purple json-c
+LIBS=purple json-glib-1.0
 
 PKG_CONFIG=pkg-config
 
@@ -15,7 +15,7 @@ PKG_LDLIBS:=$(shell $(PKG_CONFIG) --libs $(LIBS) || echo "FAILED")
 ifeq ($(PKG_LDLIBS),FAILED)
 	$(error "$(PKG_CONFIG) failed")
 endif
-LDLIBS+=$(PKG_LDLIBS)
+LDLIBS+=$(PKG_LDLIBS) -lm
 
 PLUGIN_DIR_PURPLE	=  $(shell $(PKG_CONFIG) --variable=plugindir purple)
 DATA_ROOT_DIR_PURPLE	=  $(shell $(PKG_CONFIG) --variable=datarootdir purple)

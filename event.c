@@ -4,23 +4,15 @@
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <json-c/json.h>
 #include <purple.h>
-#include <math.h>
+#include <json-glib/json-glib.h>
 
 #include "axon.h"
-#include "blist.h"
 #include "chat.h"
 #include "common.h"
 #include "connection.h"
-#include "conversation.h"
-#include "debug.h"
 #include "event.h"
-#include "eventloop.h"
-#include "imgstore.h"
-#include "json_object.h"
-#include "server.h"
-#include "util.h"
+#include "glibconfig.h"
 
 typedef struct
 {
@@ -31,39 +23,42 @@ typedef struct
 } ChatInvitaion;
 
 void
-chat_new_arrival_cb (PurpleConnection *pc, Data event)
+chat_new_arrival_cb (PurpleConnection *pc, JsonReader *event)
 {
   PurpleConversation	*conv;
-  Data			 id, name;
+  const gchar		*name;
+  gint64		 id;
 
-  json_object_object_get_ex (event, "id", &id);
-  json_object_object_get_ex (event, "name", &name);
-
-  conv = purple_find_chat (pc, json_object_get_int (id));
+  json_reader_read_int (event, "id", id);
+  json_reader_read_string (event, "name", name);
+  
+  conv = purple_find_chat (pc, id);
+  
   if (conv == NULL)
     return;
 
-  purple_conv_chat_add_user (PURPLE_CONV_CHAT (conv),
-			     json_object_get_string (name), NULL, PURPLE_CBFLAGS_NONE, TRUE);
+  purple_conv_chat_add_user (PURPLE_CONV_CHAT (conv), name, NULL,
+			     PURPLE_CBFLAGS_NONE, TRUE);
   DEBUG_LOG ("cb arriving");
 }
 
 void
-chat_recall_cb (PurpleConnection *pc, Data event)
+chat_recall_cb (PurpleConnection *pc, JsonReader *event)
 {
   PurpleConversation	*conv;
+  const gchar		*name;
   gchar			 notification[32];
-  Data			 id, name;
+  gint64		 id;
 
-  json_object_object_get_ex (event, "id", &id);
-  json_object_object_get_ex (event, "name", &name);
-
-  conv = purple_find_chat (pc, json_object_get_int (id));
+  json_reader_read_int (event, "id", id);
+  json_reader_read_string (event, "name", name);
+  
+  conv = purple_find_chat (pc, id);
+  
   if (conv == NULL)
     return;
 
-  snprintf (notification, 31, "%s 撤回了一条消息。",
-	    json_object_get_string (name));
+  g_snprintf (notification, 31, "%s 撤回了一条消息。", name);
 
   purple_conv_chat_write (PURPLE_CONV_CHAT (conv),
 			  "Axon", notification,
@@ -72,22 +67,21 @@ chat_recall_cb (PurpleConnection *pc, Data event)
 }
 
 void
-chat_leave_cb (PurpleConnection *pc, Data event)
+chat_leave_cb (PurpleConnection *pc, JsonReader *event)
 {
   PurpleConversation	*conv;
-  Data			 id, name, reason;
+  const gchar	        *name;
+  gint64		 id;
 
-  json_object_object_get_ex (event, "id", &id);
-  json_object_object_get_ex (event, "name", &name);
-  json_object_object_get_ex (event, "reason", &reason);
+  json_reader_read_int (event, "id", id);
+  json_reader_read_string (event, "name", name);
 
-  conv = purple_find_chat (pc, json_object_get_int (id));
+  conv = purple_find_chat (pc, id);
+  
   if (conv == NULL)
     return;
-
-  purple_conv_chat_remove_user (PURPLE_CONV_CHAT (conv),
-				json_object_get_string (name),
-				json_object_get_string (id));
+  
+  purple_conv_chat_remove_user (PURPLE_CONV_CHAT (conv), name, "kicked");
   DEBUG_LOG ("cb leaving");
 }
 
@@ -125,80 +119,76 @@ chat_invite_refuse (ChatInvitaion *invitation, int _)
 }
 
 void
-chat_invite_cb (PurpleConnection *pc, Data event)
+chat_invite_cb (PurpleConnection *pc, JsonReader *event)
 {
-  Data chat_name, inviter, chat_id;
-  gchar *s_chat_name, *s_inviter, *s_chat_id, info[100];
+  gchar		 info[100];
+  const gchar	*chat_name, *inviter, *chat_id;
   ChatInvitaion *invitation = g_new0 (ChatInvitaion, 1);
 
-  json_object_object_get_ex (event, "name", &chat_name);
-  json_object_object_get_ex (event, "id", &chat_id);
-  json_object_object_get_ex (event, "sender", &inviter);
+  json_reader_read_string (event, "name", chat_name);
+  json_reader_read_string (event, "id", chat_id);
+  json_reader_read_string (event, "sender", inviter);
 
-  s_chat_name = g_strdup (json_object_get_string (chat_name));
-  s_inviter   = g_strdup (json_object_get_string (inviter));
-  s_chat_id   = g_strdup (json_object_get_string (chat_id));
-
-  invitation->chat_id	= s_chat_id;
-  invitation->chat_name = s_chat_name;
-  invitation->inviter	= s_inviter;
+  invitation->chat_id	= g_strdup (chat_id);
+  invitation->chat_name = g_strdup (chat_name);
+  invitation->inviter	= g_strdup (inviter);
   invitation->pc	= pc;
 
   g_snprintf (info, 99, "收到来自 %s 的群聊邀请，目标群聊：%s (%s)。",
-	    s_inviter, s_chat_name, s_chat_id);
+	    inviter, chat_name, chat_id);
 
   purple_request_action (pc, "群聊邀请", info, NULL, 1, pc->account,
-			 s_inviter, NULL, invitation, 2,
+			 inviter, NULL, invitation, 2,
 			 "同意", chat_invite_approve,
 			 "拒绝", chat_invite_refuse);
 }
 
 void
-u2u_attention_cb (PurpleConnection *pc, Data event)
+u2u_attention_cb (PurpleConnection *pc, JsonReader *event)
 {
-  Data id;
-  json_object_object_get_ex (event, "sender", &id);
-  serv_got_attention (pc, json_object_get_string (id), 0);
+  const gchar	*sender;
+  json_reader_read_string (event, "sender", sender);
+  serv_got_attention (pc, sender, 0);
 }
 
 void
-u2u_event_cb (PurpleConnection *pc, Data event)
+u2u_event_cb (PurpleConnection *pc, JsonReader *event)
 {
-  Data id, text, timestamp;
+  const gchar   *text, *sender;
+  gint64	 time;
 
-  json_object_object_get_ex (event, "sender", &id);
-  json_object_object_get_ex (event, "text", &text);
-  json_object_object_get_ex (event, "time", &timestamp);
+  json_reader_read_string (event, "sender", sender);
+  json_reader_read_string (event, "text", text);
+  
+  json_reader_read_int (event, "time", time);
 
-  serv_got_im (pc, json_object_get_string (id), json_object_get_string (text),
-	       PURPLE_MESSAGE_RECV, json_object_get_int64 (timestamp));
+  serv_got_im (pc, sender, text, PURPLE_MESSAGE_RECV, time);
 }
 
 void
-c2u_event_cb (PurpleConnection *pc, Data event)
+c2u_event_cb (PurpleConnection *pc, JsonReader *event)
 {
-  Data id, name, time, text, sender;
-  PurpleConversation *conv;
+  const gchar	        *name, *text, *sender;
+  gint64		 time, id;
+  PurpleConversation	*conv;
 
-  json_object_object_get_ex (event, "id", &id);
-  json_object_object_get_ex (event, "name", &name);
-  json_object_object_get_ex (event, "time", &time);
-  json_object_object_get_ex (event, "text", &text);
-  json_object_object_get_ex (event, "sender", &sender);
+  json_reader_read_string (event, "name", name);
+  json_reader_read_string (event, "text", text);
+  json_reader_read_string (event, "sender", sender);
 
-  conv = purple_find_chat (pc, json_object_get_int (id));
+  json_reader_read_int (event, "id", id);
+  json_reader_read_int (event, "time", time);
+
+  conv = purple_find_chat (pc, id);
 
   if (conv == NULL)
     {
-      gchar *s_name;
-      s_name = g_strdup (json_object_get_string (name));
-      conv = serv_got_joined_chat (pc, json_object_get_int (id), s_name);
+      gchar *s_name = g_strdup (name);
+      conv = serv_got_joined_chat (pc, id, s_name);
       update_chat_members (pc, conv);
     }
 
-  serv_got_chat_in (pc, json_object_get_int (id), json_object_get_string (sender),
-		    PURPLE_MESSAGE_RECV, json_object_get_string (text),
-		    json_object_get_int64 (time));
+  serv_got_chat_in (pc, id, sender, PURPLE_MESSAGE_RECV, text, time);
 }
 
 void
@@ -256,56 +246,54 @@ c2u_img_download_cb (PurpleUtilFetchUrlData *_, gpointer dptr,
 }
 
 void
-c2u_img_event_cb (PurpleConnection *pc, Data event)
+c2u_img_event_cb (PurpleConnection *pc, JsonReader *event)
 {
-  MEDIA_INFO *media_info = g_malloc0 (sizeof (MEDIA_INFO));
-  Data id, name, time, url, sender;
-  PurpleConversation *conv;
+  MEDIA_INFO		*media_info = g_malloc0 (sizeof (MEDIA_INFO));
+  const gchar		*name, *url, *sender;
+  gint64		 time, id;
+  PurpleConversation	*conv;
 
-  json_object_object_get_ex (event, "id", &id);
-  json_object_object_get_ex (event, "name", &name);
-  json_object_object_get_ex (event, "time", &time);
-  json_object_object_get_ex (event, "url", &url);
-  json_object_object_get_ex (event, "sender", &sender);
+  json_reader_read_string (event, "name", name);
+  json_reader_read_string (event, "url", url);
+  json_reader_read_string (event, "sender", sender);
 
-  conv = purple_find_chat (pc, json_object_get_int (id));
+  json_reader_read_int (event, "id", id);
+  json_reader_read_int (event, "time", time);
+
+  conv = purple_find_chat (pc, id);
 
   if (conv == NULL)
     {
-      char *s_name;
-      s_name = g_strdup (json_object_get_string (name));
-      conv = serv_got_joined_chat (pc, json_object_get_int (id), s_name);
+      conv = serv_got_joined_chat (pc, id, name);
       update_chat_members (pc, conv);
     }
 
-  media_info->sender	= g_strdup (json_object_get_string (sender));
-  media_info->timestamp = json_object_get_int64 (time);
-  media_info->id	= json_object_get_int (id);
+  media_info->sender	= g_strdup (sender);
+  media_info->timestamp = time;
+  media_info->id	= id;
   media_info->pc	= pc;
 
-  purple_util_fetch_url_len (json_object_get_string (url),
-			     TRUE, NULL, TRUE, MEDIA_MAX_LEN,
+  purple_util_fetch_url_len (url, TRUE, NULL, TRUE, MEDIA_MAX_LEN,
 			     c2u_img_download_cb, media_info);
 }
 
 void
-u2u_img_event_cb (PurpleConnection *pc, Data event)
+u2u_img_event_cb (PurpleConnection *pc, JsonReader *event)
 {
   MEDIA_INFO *media_info = g_malloc0 (sizeof (MEDIA_INFO));
-  Data entry;
+  const char *entry;
 
-  json_object_object_get_ex (event, "sender", &entry);
-  media_info->sender = g_strdup (json_object_get_string (entry));
+  json_reader_read_string (event, "sender", entry);
+  media_info->sender = g_strdup (entry);
 
-  json_object_object_get_ex (event, "time", &entry);
-  media_info->timestamp = json_object_get_int64 (entry);
+  json_reader_read_string (event, "time", entry);
+  media_info->timestamp = atoi (entry);
 
   media_info->pc = pc;
 
-  json_object_object_get_ex (event, "url", &entry);
+  json_reader_read_string (event, "url", entry);
 
-  purple_util_fetch_url_len (json_object_get_string (entry),
-			     TRUE, NULL, TRUE, MEDIA_MAX_LEN,
+  purple_util_fetch_url_len (entry, TRUE, NULL, TRUE, MEDIA_MAX_LEN,
 			     u2u_img_download_cb, media_info);
 }
 
@@ -313,13 +301,14 @@ void
 event_cb (gpointer data, gint _, PurpleInputCondition __)
 {
   PD_FROM_PTR (data);
-  Data top, type, status;
-  Watcher *w = NULL;
+  NEW_WATCHER_W ();
+  gint		 retval, status, type;
+  GError	*error	    = NULL;
+  gsize		 bytes_read = 0;
 
   DEBUG_LOG ("getting an event");
 
   /* 按数字前缀的长度读取 Json 数据流 */
-  gsize bytes_read = 0;
   
   while (TRUE)
     {
@@ -334,7 +323,7 @@ event_cb (gpointer data, gint _, PurpleInputCondition __)
       if (bytes_read == 0)
 	    {
 	      DEBUG_LOG ("network failure");
-	      purple_connection_error_reason (pd->acct->gc, PURPLE_CONNECTION_ERROR_OTHER_ERROR,
+	      purple_connection_error_reason (pd->acct->gc, PURPLE_CONNECTION_ERROR_NETWORK_ERROR,
 					      "丢失了到 AXON 的连接");
 	      purple_input_remove (pd->acct->gc->inpa);
 	      return;
@@ -347,47 +336,55 @@ event_cb (gpointer data, gint _, PurpleInputCondition __)
 	  break;
 	}
     }
-    
 
   
-  DEBUG_LOG(pd->buf);
+  // DEBUG_LOG(pd->buf);
 
-  top = json_tokener_parse (pd->buf);
-  json_object_object_get_ex (top, "status", &status);
-  json_object_object_get_ex (top, "type", &type);
+  retval = json_parser_load_from_data (pd->parser, pd->buf, bytes_read - 1, &error);
+  if (retval == FALSE)
+    {
+      DEBUG_LOG ("failed to parse json data");
+      purple_connection_error_reason (pd->acct->gc, PURPLE_CONNECTION_ERROR_OTHER_ERROR,
+				      "没能处理 Json 数据");
+      purple_input_remove (pd->acct->gc->inpa);
+    }
 
-  switch (json_object_get_int (status))
+  json_reader_set_root (pd->reader, json_parser_get_root (pd->parser));
+
+  json_reader_read_int (pd->reader, "status", status);
+  
+  switch (status)
     {
     case (RET_STATUS_EVENT):	/* 事件上报 */
-      json_object_object_get_ex (top, "type", &type);
-      switch (json_object_get_int (type))
+      json_reader_read_int (pd->reader, "type", type);
+      switch (type)
 	{
 	case (E_FRIEND_MESSAGE):
-	  u2u_event_cb (pd->acct->gc, top);
+	  u2u_event_cb (pd->acct->gc, pd->reader);
 	  break;
 	case (E_FRIEND_IMG_MESSAGE):
-	  u2u_img_event_cb (pd->acct->gc, top);
+	  u2u_img_event_cb (pd->acct->gc, pd->reader);
 	  break;
 	case (E_GROUP_MESSAGE):
-	  c2u_event_cb (pd->acct->gc, top);
+	  c2u_event_cb (pd->acct->gc, pd->reader);
 	  break;
 	case (E_GROUP_IMG_MESSAGE):
-	  c2u_img_event_cb (pd->acct->gc, top);
+	  c2u_img_event_cb (pd->acct->gc, pd->reader);
 	  break;
 	case (E_FRIEND_ATTENTION):
-	  u2u_attention_cb (pd->acct->gc, top);
+	  u2u_attention_cb (pd->acct->gc, pd->reader);
 	  break;
 	case (E_GROUP_INVITE):
-	  chat_invite_cb (pd->acct->gc, top);
+	  chat_invite_cb (pd->acct->gc, pd->reader);
 	  break;
 	case (E_GROUP_INCREASE):
-	  chat_new_arrival_cb (pd->acct->gc, top);
+	  chat_new_arrival_cb (pd->acct->gc, pd->reader);
 	  break;
 	case (E_GROUP_DECREASE):
-	  chat_leave_cb (pd->acct->gc, top);
+	  chat_leave_cb (pd->acct->gc, pd->reader);
 	  break;
 	case (E_GROUP_RECALL):
-	  chat_recall_cb (pd->acct->gc, top);
+	  chat_recall_cb (pd->acct->gc, pd->reader);
 	  break;
 	default:
 	  DEBUG_LOG ("unexpected event type");
@@ -402,7 +399,7 @@ event_cb (gpointer data, gint _, PurpleInputCondition __)
 	  DEBUG_LOG (pd->buf);
 	  return;
 	}
-      w->ok (pd->acct->gc, w->data, top);
+      w->ok (pd->acct->gc, w->data, pd->reader);
       break;
     default:			/* 错误处理 */
       w = g_queue_pop_head (pd->queue);
@@ -412,21 +409,20 @@ event_cb (gpointer data, gint _, PurpleInputCondition __)
 	  DEBUG_LOG (pd->buf);
 	  return;
 	}
-      w->err (pd->acct->gc, w->data, top);
+      w->err (pd->acct->gc, w->data, pd->reader);
     }
 
-  data_free (top);
   g_free (w);
 }
 
 void
-watcher_nil_ok (PurpleConnection *_, gpointer ___, Data __)
+watcher_nil_ok (PurpleConnection *_, gpointer ___, JsonReader *__)
 {
   DEBUG_LOG ("successfully got a response");
 }
 
 void
-watcher_nil_err (PurpleConnection *_, gpointer ___, Data __)
+watcher_nil_err (PurpleConnection *_, gpointer ___, JsonReader *__)
 {
   DEBUG_LOG ("got a failed response");
 }

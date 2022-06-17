@@ -1,6 +1,3 @@
-#include "json_object.h"
-#include "json_types.h"
-
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
@@ -8,29 +5,35 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
-#include <json-c/json.h>
 
 #include "axon.h"
+#include <json-glib/json-glib.h>
 #include "common.h"
+
+typedef JsonObject* Data;
+JsonGenerator *g = NULL;
+JsonNode *n = NULL;
 
 Data
 data_new ()
 {
-  return json_object_new_object ();
+  if (g == NULL)
+    g = json_generator_new ();
+  if (n == NULL)
+    n = json_node_new (JSON_NODE_OBJECT);
+  return json_object_new ();
 }
 
 void
 data_free (Data data)
 {
-  while (json_object_put (data) != 1)
-    {
-    }
+  json_object_unref (data);
 }
 
 void
 data_set_param (Data data, const char *k, const char *v)
 {
-  json_object_object_add (data, k, json_object_new_string (v));
+  json_object_set_string_member (data, k, v);
 }
 
 void
@@ -44,9 +47,15 @@ data_write_to_fd (Data data, int fd)
 {
   if (fd == -1)
     return -1;
-  const char *plain;
-  plain = json_object_to_json_string (data);
-  write (fd, plain, strlen (plain));
+
+  json_node_set_object (n, data);
+  json_generator_set_root (g, n);
+  
+  const char	*plain;
+  gsize		 length;
+  
+  plain = json_generator_to_data (g, &length);
+  write (fd, plain, length);
   return write (fd, "\n", 1);
 }
 

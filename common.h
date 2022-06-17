@@ -3,7 +3,7 @@
 
 #include <glib.h>
 #include <purple.h>
-#include <json-c/json.h>
+#include <json-glib/json-glib.h>
 
 typedef struct
 {
@@ -13,14 +13,10 @@ typedef struct
   gchar		*buf;
   gsize		 buf_size;
   GQueue	*queue;
+  JsonParser	*parser;
+  JsonReader	*reader;
 } ProtoData;
 
-/* 指代 JSON 数据 */
-typedef struct json_object *Data;
-
-void data_free (Data);
-
-void data_set_param (Data, const char *, const char *);
 
 /* “关于” 信息 */
 #define DISPLAY_VERSION "1.0.0"
@@ -48,6 +44,31 @@ void data_set_param (Data, const char *, const char *);
     __FUNCTION__, __LINE__, ## x)
 #define PD_FROM_PTR(ptr) ProtoData *pd = ptr
 #define NEW_WATCHER_W() Watcher *w = g_new(Watcher, 1)
+
+/* Json 处理 */
+#define json_reader_read_string(reader, key, s)	\
+  json_reader_read_member (reader, key);	\
+  s = json_reader_get_string_value (reader);	\
+  json_reader_end_member (reader)
+
+#define json_reader_read_element_string(reader, i, s)	\
+  json_reader_read_element (reader, i);	\
+  s = json_reader_get_string_value (reader);	\
+  json_reader_end_element (reader)
+
+#define json_reader_read_int(reader, key, v)	\
+  json_reader_read_member (reader, key);	\
+  v = json_reader_get_int_value (reader);	\
+  json_reader_end_member (reader);
+
+#define json_reader_read_element_int(reader, i, v)	\
+  json_reader_read_element (reader, i);		\
+  v = json_reader_get_int_value (reader);	\
+  json_reader_end_element (reader)
+
+#define json_reader_log_error(r)		\
+  if (json_reader_get_error (r) != NULL)	\
+    DEBUG_LOG (json_reader_get_error (r)->message)
 
 /* 考虑到两千人群，缓冲区需要这么大 */
 #define DEFAULT_BUFSIZE 8192

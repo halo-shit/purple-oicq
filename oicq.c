@@ -1,19 +1,10 @@
-#include "account.h"
-#include "blist.h"
-#include "connection.h"
-#include "conversation.h"
-#include "debug.h"
 #include "event.h"
-#include "eventloop.h"
 #include "login.h"
-#include "prpl.h"
 #include "common.h"
-
 #include "axon.h"
 #include "chat.h"
-#include "server.h"
-#include "status.h"
-#include "util.h"
+
+#include <json-glib/json-glib.h>
 #include <purple.h>
 #include <unistd.h>
 
@@ -93,6 +84,9 @@ prpl_close (PurpleConnection *pc)
   close (pd->fd);
 
   DEBUG_LOG ("freeing resources");
+  g_object_unref (pd->reader);
+  g_object_unref (pd->parser);
+  
   g_free (pd->buf);
   g_queue_free (pd->queue);
   g_free (pd->whoami);
@@ -126,6 +120,8 @@ prpl_login (PurpleAccount *acct)
   pd->buf      = g_malloc0 (DEFAULT_BUFSIZE);
   pd->buf_size = DEFAULT_BUFSIZE;
   pd->queue    = g_queue_new ();
+  pd->parser   = json_parser_new ();
+  pd->reader   = json_reader_new (NULL);
   purple_connection_set_protocol_data (pc, pd);
 
   DEBUG_LOG ("waiting for next procedure");

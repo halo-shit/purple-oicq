@@ -15,8 +15,8 @@ void u2c_message_send (PurpleConnection *, PurpleConversation *, const gchar *);
 
 void u2c_img_message_send (PurpleConnection *, PurpleConversation *, gint);
 
-void lookup_ok (PurpleConnection *, gpointer, Data);
+void lookup_ok (PurpleConnection *, gpointer, JsonReader *);
 
-void lookup_err (PurpleConnection *, gpointer, Data);
+void lookup_err (PurpleConnection *, gpointer, JsonReader *);
 
 #endif

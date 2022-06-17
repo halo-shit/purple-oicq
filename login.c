@@ -1,23 +1,17 @@
 #include "login.h"
-#include "account.h"
 #include "axon.h"
-#include "blist.h"
-#include "buddyicon.h"
 #include "common.h"
-#include "connection.h"
-#include "conversation.h"
+#include "debug.h"
 #include "event.h"
-#include "json_object.h"
-#include "notify.h"
-#include "request.h"
-#include "util.h"
+#include "glibconfig.h"
+
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
 #include <glib.h>
 
-void axon_client_login_err (PurpleConnection *, gpointer, Data);
+void axon_client_login_err (PurpleConnection *, gpointer, JsonReader *);
 
 void
 buddy_icon_download_cb (PurpleUtilFetchUrlData * _, gpointer dptr,
@@ -56,26 +50,25 @@ purple_update_buddy_icon (PurpleConnection * pc, int64_t id, char *name)
 }
 
 void
-purple_init_err (PurpleConnection * pc, gpointer message, Data _)
+purple_init_err (PurpleConnection * pc, gpointer message, JsonReader *_)
 {
   purple_connection_error_reason (pc, PURPLE_CONNECTION_ERROR_OTHER_ERROR, message);
 }
 
 void
-axon_client_glist_ok (PurpleConnection * pc, gpointer _, Data data)
+axon_client_glist_ok (PurpleConnection * pc, gpointer _, JsonReader *data)
 {
   DEBUG_LOG ("sync groups");
 
   gint		 chat_count;
   GHashTable	*components;
-  gchar		*s_name, *s_id;
-  Data		 name, name_list, id, id_list;
+  const gchar	*name, *id;
   PurpleGroup	*group;
   PurpleChat	*chat;
 
-  json_object_object_get_ex (data, "idlist", &id_list);
-  json_object_object_get_ex (data, "namelist", &name_list);
-  chat_count = json_object_array_length (id_list);
+  json_reader_read_member (data, "idlist");
+  chat_count = json_reader_count_elements (data);
+  json_reader_end_member (data);
   /* 如果对应分组不存在就新建一个 */
   group = purple_find_group (PRPL_SYNC_GROUP_CHAT);
   if (group == NULL)
@@ -91,16 +84,18 @@ axon_client_glist_ok (PurpleConnection * pc, gpointer _, Data data)
   /* 将群聊加入分组 */
   for (int i = 0; i < chat_count; i++)
     {
-      name = json_object_array_get_idx (name_list, i);
-      id = json_object_array_get_idx (id_list, i);
-
-      s_id = g_strdup (json_object_get_string (id));
-      s_name = g_strdup (json_object_get_string (name));
+      json_reader_read_member (data, "namelist");
+      json_reader_read_element_string (data, i, name);
+      json_reader_end_member (data);
+      
+      json_reader_read_member (data, "idlist");
+      json_reader_read_element_string (data, i, id);
+      json_reader_end_member (data);
 
       components = g_hash_table_new_full (g_str_hash, g_str_equal, NULL, g_free);
-      g_hash_table_insert (components, PRPL_CHAT_INFOID, s_id);
-      g_hash_table_insert (components, PRPL_CHAT_INFONAME, s_name);
-      chat = purple_chat_new (pc->account, s_name, components);
+      g_hash_table_insert (components, PRPL_CHAT_INFOID, g_strdup (id));
+      g_hash_table_insert (components, PRPL_CHAT_INFONAME, g_strdup (name));
+      chat = purple_chat_new (pc->account, name, components);
 
       purple_blist_add_chat (chat, group, NULL);
     }
@@ -111,20 +106,19 @@ skip:{
 }
 
 void
-axon_client_flist_ok (PurpleConnection * pc, gpointer _, Data data)
+axon_client_flist_ok (PurpleConnection * pc, gpointer _, JsonReader *data)
 {
   DEBUG_LOG ("sync friends");
 
   PD_FROM_PTR (pc->proto_data);
   gint		 friend_count;
-  const gchar	*s_name;
+  const gchar	*name;
   PurpleGroup	*group;
   PurpleBuddy	*buddy;
-  Data		 name, list, idlist;
 
-  json_object_object_get_ex (data, "list", &list);
-  json_object_object_get_ex (data, "idlist", &idlist);
-  friend_count = json_object_array_length (list);
+  json_reader_read_member (data, "list");
+  friend_count = json_reader_count_elements (data);
+  json_reader_end_member (data);
   /* 如果对应分组不存在就新建一个 */
   group = purple_find_group (PRPL_SYNC_GROUP_BUDDY);
   if (group == NULL)
@@ -135,26 +129,32 @@ axon_client_flist_ok (PurpleConnection * pc, gpointer _, Data data)
   /* 将好友加入分组 */
   for (int i = 0; i < friend_count; i++)
     {
-      name = json_object_array_get_idx (list, i);
-      s_name = json_object_get_string (name);
+      json_reader_read_member (data, "list");
+      json_reader_read_element_string (data, i, name);
+      json_reader_end_member (data);
+      DEBUG_LOG (name);
       /* 若用户已存在，则直接设置在线状态 */
     set_online_status:
-      if (purple_find_buddy (pc->account, s_name) != NULL)
+      if (purple_find_buddy (pc->account, name) != NULL)
 	{
-	  purple_prpl_got_user_status (pc->account, s_name, "online", NULL);
+	  purple_prpl_got_user_status (pc->account, name, "online", NULL);
 	  continue;
 	}
       /* 不显示 BabyQ */
-      if (!strcmp (s_name, "babyQ"))
+      if (!strcmp (name, "babyQ"))
 	continue;
       /* 添加好友 */
-      buddy = purple_buddy_new (pc->account, s_name, s_name);
+      buddy = purple_buddy_new (pc->account, name, name);
       purple_blist_add_buddy (buddy, NULL, group, NULL);
       /* 处理好友头像 */
-      char *altname = NULL;
-      altname = g_strdup (s_name);
-      name = json_object_array_get_idx (idlist, i);
-      purple_update_buddy_icon (pc, json_object_get_int64 (name), altname);
+      char *altname = NULL; gint64 id;
+      altname = g_strdup (name);
+
+      json_reader_read_member (data, "idlist");
+      json_reader_read_element_int (data, i, id);
+      json_reader_end_member (data);
+      
+      purple_update_buddy_icon (pc, id, altname);
       goto set_online_status;
     }
 
@@ -168,18 +168,15 @@ axon_client_flist_ok (PurpleConnection * pc, gpointer _, Data data)
 }
 
 void
-axon_client_whoami_ok (PurpleConnection * pc, gpointer _, Data response)
+axon_client_whoami_ok (PurpleConnection * pc, gpointer _, JsonReader *response)
 {
   PD_FROM_PTR (pc->proto_data);
-  Data	name;
+  const gchar	*name;
 
   DEBUG_LOG ("whoami ok, login completed");
-  json_object_object_get_ex (response, "name", &name);
+  json_reader_read_string (response, "name", name);
 
-  gchar *whoami = g_malloc0 (json_object_get_string_len (name) + 1);
-  strcpy (whoami, json_object_get_string (name));
-
-  pd->whoami = whoami;
+  pd->whoami = g_strdup (name);
 
   NEW_WATCHER_W ();
   w->data = "没能同步好友列表";
@@ -191,7 +188,7 @@ axon_client_whoami_ok (PurpleConnection * pc, gpointer _, Data response)
 }
 
 void
-axon_client_login_ok (PurpleConnection * pc, gpointer _, Data __)
+axon_client_login_ok (PurpleConnection * pc, gpointer _, JsonReader *__)
 {
   /* 将单次扫码登录改为密码登录 */
   if (purple_strequal (purple_account_get_string (pc->account, PRPL_ACCT_OPT_LOGIN, PRPL_ACCT_OPT_USE_PASSWORD),
@@ -227,21 +224,21 @@ go_ahead_cb (void *dptr)
 }
 
 void
-axon_client_login_err (PurpleConnection * pc, gpointer _, Data data)
+axon_client_login_err (PurpleConnection *pc, gpointer _, JsonReader *data)
 {
   guchar	*dptr = NULL;
-  Data		 login_t, tmp;
+  gint		 login_t;
   FILE		*qrcode;
+  const gchar	*message;
   gsize		 dlen = 0;
 
-  json_object_object_get_ex (data, "login", &login_t);
+  json_reader_read_int (data, "login", login_t);
 
-  switch (json_object_get_int (login_t))
+  switch (login_t)
     {
     case L_ERROR:
-      json_object_object_get_ex (data, "message", &tmp);
-      purple_connection_error_reason (pc, PURPLE_CONNECTION_ERROR_OTHER_ERROR,
-				      json_object_get_string (tmp));
+      json_reader_read_string (data, "message", message);
+      purple_connection_error_reason (pc, PURPLE_CONNECTION_ERROR_OTHER_ERROR, message);
       break;
     case L_SLIDER:
       /*
@@ -257,14 +254,14 @@ axon_client_login_err (PurpleConnection * pc, gpointer _, Data data)
 				      "本次登录需要滑块登录，请先进行一次扫码登录以跳过。");
       break;
     case L_QRCODE:
-      json_object_object_get_ex (data, "data", &tmp);
+      json_reader_read_string (data, "data", message);
       purple_notify_message (pc, PURPLE_NOTIFY_MSG_WARNING, "登录验证",
 			     "本次登录需要扫描二维码，请前往弹出图片扫描，并在扫描后关闭本窗口。\n",
 			     "如果图片没有弹出，请访问 /tmp/oicq-qrcode-verify.png。\n"
 			     "如果二维码失效，请关闭窗口以再次获取。",
 			     go_ahead_cb, pc);
 
-      dptr = purple_base64_decode (json_object_get_string (tmp), &dlen);
+      dptr = purple_base64_decode (message, &dlen);
 
       qrcode = fopen ("/tmp/oicq-qrcode-verify.png", "w");
       if (qrcode == NULL)
@@ -280,17 +277,17 @@ axon_client_login_err (PurpleConnection * pc, gpointer _, Data data)
       system ("xdg-open /tmp/oicq-qrcode-verify.png &");
       break;
     case L_DEVICE:
-      json_object_object_get_ex (data, "url", &tmp);
+      json_reader_read_string (data, "url", message);
       purple_notify_message (pc, PURPLE_NOTIFY_MSG_WARNING, "登录验证",
 			     "本次登录需要解锁设备锁，请前往弹出链接解锁，并在完成后关闭此窗口提交。",
 			     NULL, go_ahead_cb, pc);
-      purple_notify_uri (pc, json_object_get_string (tmp));
+      purple_notify_uri (pc, message);
       break;
     }
 }
 
 void
-axon_client_init_ok (PurpleConnection * pc, gpointer _, Data __)
+axon_client_init_ok (PurpleConnection * pc, gpointer _, JsonReader *__)
 {
   PD_FROM_PTR (pc->proto_data);
 

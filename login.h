@@ -1,6 +1,7 @@
 #ifndef LOGIN_H
 #define LOGIN_H
 
+#include <json-glib/json-glib.h>
 #include <purple.h>
 
 #include "common.h"
@@ -19,8 +20,8 @@ enum
   L_QRCODE = 3,
 };
 
-void axon_client_init_ok (PurpleConnection *, gpointer, Data);
+void axon_client_init_ok (PurpleConnection *, gpointer, JsonReader *);
 
-void purple_init_err (PurpleConnection *, gpointer, Data);
+void purple_init_err (PurpleConnection *, gpointer, JsonReader *);
 
 #endif
