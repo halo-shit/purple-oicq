@@ -1,6 +1,8 @@
 #include "login.h"
 #include "axon.h"
+#include "blist.h"
 #include "common.h"
+#include "conversation.h"
 #include "debug.h"
 #include "event.h"
 #include "glibconfig.h"
@@ -10,6 +12,33 @@
 #include <string.h>
 
 #include <glib.h>
+
+/* Copyright (c) 2014-2020 Eion Robb GPLv3 */
+PurpleChat *
+teams_find_chat_from_node(PurpleAccount *account, const char *id, PurpleBlistNode *root)
+{
+  PurpleBlistNode *node;
+
+  for (node = root; node != NULL; node = purple_blist_node_next (node, TRUE)) {
+    if (PURPLE_BLIST_NODE_IS_CHAT(node)) {
+      PurpleChat *chat = PURPLE_CHAT (node);
+
+      if (purple_chat_get_account (chat) != account) {
+	continue;
+      }
+
+      GHashTable *components = purple_chat_get_components (chat);
+      const gchar *chat_id = g_hash_table_lookup (components, PRPL_CHAT_INFOID);
+
+      if (purple_strequal (chat_id, id)) {
+	return chat;
+      }
+    }
+  }
+
+  return NULL;
+}
+/*****************************************/
 
 void axon_client_login_err (PurpleConnection *, gpointer, JsonReader *);
 
@@ -36,7 +65,7 @@ buddy_icon_download_cb (PurpleUtilFetchUrlData * _, gpointer dptr,
 }
 
 void
-purple_update_buddy_icon (PurpleConnection * pc, int64_t id, char *name)
+purple_update_buddy_icon (PurpleConnection *pc, int64_t id, char *name)
 {
   gchar		 url[64];
   BUDDY_INFO	*binfo = g_malloc0 (sizeof (BUDDY_INFO));
@@ -50,38 +79,28 @@ purple_update_buddy_icon (PurpleConnection * pc, int64_t id, char *name)
 }
 
 void
-purple_init_err (PurpleConnection * pc, gpointer message, JsonReader *_)
+purple_init_err (PurpleConnection *pc, gpointer message, JsonReader *_)
 {
   purple_connection_error_reason (pc, PURPLE_CONNECTION_ERROR_OTHER_ERROR, message);
 }
 
 void
-axon_client_glist_ok (PurpleConnection * pc, gpointer _, JsonReader *data)
+axon_client_glist_ok (PurpleConnection *pc, gpointer _, JsonReader *data)
 {
   DEBUG_LOG ("sync groups");
 
   gint		 chat_count;
   GHashTable	*components;
   const gchar	*name, *id;
-  PurpleGroup	*group;
+  PurpleGroup	*group = NULL;
   PurpleChat	*chat;
 
   json_reader_read_member (data, "idlist");
   chat_count = json_reader_count_elements (data);
   json_reader_end_member (data);
-  /* 如果对应分组不存在就新建一个 */
+  
   group = purple_find_group (PRPL_SYNC_GROUP_CHAT);
-  if (group == NULL)
-    {
-      DEBUG_LOG ("group not found, will create one");
-      group = purple_group_new (PRPL_SYNC_GROUP_CHAT);
-      purple_blist_add_group (group, NULL);
-    }
-  else
-    {
-      goto skip;
-    }
-  /* 将群聊加入分组 */
+  
   for (int i = 0; i < chat_count; i++)
     {
       json_reader_read_member (data, "namelist");
@@ -92,21 +111,30 @@ axon_client_glist_ok (PurpleConnection * pc, gpointer _, JsonReader *data)
       json_reader_read_element_string (data, i, id);
       json_reader_end_member (data);
 
-      components = g_hash_table_new_full (g_str_hash, g_str_equal, NULL, g_free);
-      g_hash_table_insert (components, PRPL_CHAT_INFOID, g_strdup (id));
-      g_hash_table_insert (components, PRPL_CHAT_INFONAME, g_strdup (name));
-      chat = purple_chat_new (pc->account, name, components);
+      if (teams_find_chat_from_node (pc->account, id, purple_blist_get_root ()) == NULL)
+	{
+	  if (group == NULL)
+	    {
+	      /* 如果对应分组不存在就新建一个 */
+	      DEBUG_LOG ("group not found, will create one");
+	      group = purple_group_new (PRPL_SYNC_GROUP_CHAT);
+	      purple_blist_add_group (group, NULL);
+	    }
 
-      purple_blist_add_chat (chat, group, NULL);
+	  components = g_hash_table_new_full (g_str_hash, g_str_equal, NULL, g_free);
+	  g_hash_table_insert (components, PRPL_CHAT_INFOID, g_strdup (id));
+	  g_hash_table_insert (components, PRPL_CHAT_INFONAME, g_strdup (name));
+	  chat = purple_chat_new (pc->account, name, components);
+
+	  purple_blist_add_chat (chat, group, NULL);
+	}
     }
 
-skip:{
-  }
   purple_connection_set_state (pc, PURPLE_CONNECTED);
 }
 
 void
-axon_client_flist_ok (PurpleConnection * pc, gpointer _, JsonReader *data)
+axon_client_flist_ok (PurpleConnection *pc, gpointer _, JsonReader *data)
 {
   DEBUG_LOG ("sync friends");
 
@@ -167,7 +195,7 @@ axon_client_flist_ok (PurpleConnection * pc, gpointer _, JsonReader *data)
 }
 
 void
-axon_client_whoami_ok (PurpleConnection * pc, gpointer _, JsonReader *response)
+axon_client_whoami_ok (PurpleConnection *pc, gpointer _, JsonReader *response)
 {
   PD_FROM_PTR (pc->proto_data);
   const gchar	*name;
@@ -187,7 +215,7 @@ axon_client_whoami_ok (PurpleConnection * pc, gpointer _, JsonReader *response)
 }
 
 void
-axon_client_login_ok (PurpleConnection * pc, gpointer _, JsonReader *__)
+axon_client_login_ok (PurpleConnection *pc, gpointer _, JsonReader *__)
 {
   /* 将单次扫码登录改为密码登录 */
   if (purple_strequal (purple_account_get_string (pc->account, PRPL_ACCT_OPT_LOGIN, PRPL_ACCT_OPT_USE_PASSWORD),
